@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRコードスキャナー</title>
+  <!-- jsQRライブラリの読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      text-align: center;
+      background-color: #121212;
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .scanner-container {
+      position: relative;
+      width: 90%;
+      max-width: 480px;
+      aspect-ratio: 3 / 4;
+      border: 3px solid #007bff;
+      border-radius: 12px;
+      overflow: hidden;
+      background-color: #000000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.1em;
+      font-weight: bold;
+      color: #a0a0a0;
+      min-height: 1.5em;
+    }
+    /* スキャン用のターゲット枠線 */
+    .scan-guide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 200px;
+      height: 200px;
+      transform: translate(-50%, -50%);
+      border: 2px dashed rgba(255, 255, 255, 0.5);
+      border-radius: 8px;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanner-container">
+    <video id="video-preview" autoplay playsinline muted></video>
+    <div class="scan-guide"></div>
+  </div>
+  <div id="status">カメラ起動中...</div>
+
+  <script>
+    const video = document.getElementById('video-preview');
+    const statusDiv = document.getElementById('status');
+    let scanning = true;
+
+    // 1. URLパラメータからカメラの向き（user / environment）を取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const facingMode = urlParams.get('mode') || 'environment'; // デフォルトは背面
+
+    // 2. 指定されたカメラで起動
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    })
+    .then(stream => {
+      video.srcObject = stream;
+      video.play();
+      statusDiv.innerText = "QRコードを枠内にかざしてください";
+      requestAnimationFrame(tick);
+    })
+    .catch(err => {
+      console.error("カメラ起動エラー:", err);
+      statusDiv.innerText = "カメラの起動に失敗しました。権限を確認してください。";
+    });
+
+    // 3. QRコードの解析ループ
+    function tick() {
+      if (!scanning) return;
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code && code.data) {
+          scanning = false;
+          statusDiv.innerText = "読み取り成功！";
+
+          // 親ウィンドウ（GASアプリ）へデータを返却
+          if (window.opener) {
+            // セキュリティに厳格にする場合は第2引数にGASのWebアプリURLを指定可能
+            window.opener.postMessage({ type: 'qr-result', data: code.data }, "*");
+          }
+          
+          // カメラストリームを停止し、タブを閉じる
+          const stream = video.srcObject;
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+          }
+          window.close();
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>
