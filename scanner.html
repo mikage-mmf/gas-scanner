@@ -278,7 +278,11 @@
         .catch(err => {
           console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
           if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
-          setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
+          if (err.name === 'NotReadableError') {
+            setStatus('error', '⚠️ このカメラは他のアプリが使用中です。\nPoly Camera Pro等の仮想カメラソフトを終了してから\nページを再読み込みしてください。');
+          } else {
+            setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
+          }
         });
       }, 300);
     }
