@@ -226,8 +226,17 @@
 
     // カメラ起動（deviceId指定があればそのデバイス、なければfacingModeで起動）
     function startCamera(deviceIdOrMode) {
+      console.log(`[Camera] startCamera() 呼び出し。引数: "${deviceIdOrMode}"`);
+      console.log(`[Camera] 現在のvideoDevices一覧:`, videoDevices.map((d, i) => `[${i}] ${d.label} (${d.deviceId.substring(0,8)}…)`));
+      console.log(`[Camera] currentDeviceIndex: ${currentDeviceIndex}`);
+
       if (currentStream) {
-        currentStream.getTracks().forEach(t => t.stop());
+        console.log('[Camera] 既存ストリームを停止中…');
+        currentStream.getTracks().forEach(t => {
+          console.log(`[Camera]  → track停止: ${t.label} (state: ${t.readyState})`);
+          t.stop();
+        });
+        currentStream = null;
       }
       scanning = false;
       statusArea.textContent = 'カメラ起動中…';
@@ -239,35 +248,41 @@
         ? { video: { facingMode: deviceIdOrMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }
         : { video: { deviceId: { exact: deviceIdOrMode }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
-      // カメラハードウェアが解放されるまで少し待ってから起動（NotReadableError 対策）
+      console.log('[Camera] 使用するconstraint:', JSON.stringify(constraint));
+
+      // カメラハードウェアが解放されるまで少し待ってから起動
       setTimeout(() => {
+        console.log('[Camera] getUserMedia() 開始…');
         navigator.mediaDevices.getUserMedia(constraint)
         .then(stream => {
           currentStream = stream;
+          const track = stream.getVideoTracks()[0];
+          console.log(`[Camera] ✅ 起動成功: "${track?.label}", deviceId: ${track?.getSettings()?.deviceId?.substring(0,12)}…`);
           video.srcObject = stream;
           video.play();
           scanning = true;
-          // 起動成功後に利用可能なデバイス一覧を取得（ラベル取得のため許可後に実行）
+          // 起動成功後に利用可能なデバイス一覧を更新
           navigator.mediaDevices.enumerateDevices().then(devices => {
             videoDevices = devices.filter(d => d.kind === 'videoinput');
-            // スイッチボタンの表示制御（1台のみなら非表示）
+            console.log('[Camera] 利用可能なカメラ一覧:', videoDevices.map((d, i) => `[${i}] ${d.label}`));
             const btn = document.getElementById('switch-btn');
             if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
-            // 現在使用中のデバイスのインデックスを特定
-            const activeId = stream.getVideoTracks()[0]?.getSettings()?.deviceId;
+            const activeId = track?.getSettings()?.deviceId;
             const idx = videoDevices.findIndex(d => d.deviceId === activeId);
             if (idx !== -1) currentDeviceIndex = idx;
+            console.log(`[Camera] activeDeviceIndex: ${currentDeviceIndex}`);
           });
-          const label = stream.getVideoTracks()[0]?.label || '';
-          setStatus('ready', `QRコードをかざしてください`);
+          setStatus('ready', 'QRコードをかざしてください');
           requestAnimationFrame(tick);
         })
         .catch(err => {
-          console.error('カメラエラー:', err);
+          console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
+          if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
           setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
         });
-      }, 300); // 前のストリームが解放されるまで300ms待機
+      }, 300);
     }
+
 
     // ─────────────────────────────────────────
     // ステータス表示ヘルパー
