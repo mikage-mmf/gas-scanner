@@ -177,6 +177,15 @@
   <button id="switch-btn">🔄 カメラ切り替え</button>
 
   <script>
+    // ─────────────────────────────────────────
+    // ★★★ 設定エリア ★★★
+    // GASウェブアプリの「デプロイURL」と、スクリプトプロパティに設定した
+    // SCANNER_API_KEY の値をここに入力してください。
+    // ─────────────────────────────────────────
+    const GAS_ENDPOINT   = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+    const SCANNER_API_KEY = 'YOUR_SCANNER_API_KEY';
+    // ─────────────────────────────────────────
+
     const video          = document.getElementById('video-preview');
     const statusArea     = document.getElementById('status-area');
     const container      = document.getElementById('scanner-container');
@@ -294,16 +303,36 @@
 
           // ① ピッ音を鳴らす
           playBeep();
-          // ② 演出を表示
+          // ② 演出を表示（fetch完了を待たずに即時）
           showSuccessFeedback();
-          // ③ 親ウィンドウへデータ送信（GASアプリ側へ）
-          if (window.opener) {
-            window.opener.postMessage({ type: 'qr-result', data: code.data }, '*');
-          }
+          // ③ GAS doPost エンドポイントへ直接送信
+          sendToGas(code.data);
           return;
         }
       }
       requestAnimationFrame(tick);
+    }
+
+    // ─────────────────────────────────────────
+    // GAS doPost へのデータ送信
+    // ─────────────────────────────────────────
+    function sendToGas(qrCodeId) {
+      fetch(GAS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, // GASのfetch制約上、text/plainを使用
+        body: JSON.stringify({ apiKey: SCANNER_API_KEY, qrCodeId: qrCodeId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.warn('[Scanner] GASエラー:', data.message);
+          // エラーの場合はステータスに表示（演出後2秒で上書きされる）
+        }
+        console.log('[Scanner] GAS応答:', data.message);
+      })
+      .catch(err => {
+        console.error('[Scanner] 送信失敗:', err);
+      });
     }
 
     // ─────────────────────────────────────────
