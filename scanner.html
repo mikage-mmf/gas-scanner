@@ -239,31 +239,34 @@
         ? { video: { facingMode: deviceIdOrMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }
         : { video: { deviceId: { exact: deviceIdOrMode }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
-      navigator.mediaDevices.getUserMedia(constraint)
-      .then(stream => {
-        currentStream = stream;
-        video.srcObject = stream;
-        video.play();
-        scanning = true;
-        // 起動成功後に利用可能なデバイス一覧を取得（ラベル取得のため許可後に実行）
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          videoDevices = devices.filter(d => d.kind === 'videoinput');
-          // スイッチボタンの表示制御（1台のみなら非表示）
-          const btn = document.getElementById('switch-btn');
-          if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
-          // 現在使用中のデバイスのインデックスを特定
-          const activeId = stream.getVideoTracks()[0]?.getSettings()?.deviceId;
-          const idx = videoDevices.findIndex(d => d.deviceId === activeId);
-          if (idx !== -1) currentDeviceIndex = idx;
+      // カメラハードウェアが解放されるまで少し待ってから起動（NotReadableError 対策）
+      setTimeout(() => {
+        navigator.mediaDevices.getUserMedia(constraint)
+        .then(stream => {
+          currentStream = stream;
+          video.srcObject = stream;
+          video.play();
+          scanning = true;
+          // 起動成功後に利用可能なデバイス一覧を取得（ラベル取得のため許可後に実行）
+          navigator.mediaDevices.enumerateDevices().then(devices => {
+            videoDevices = devices.filter(d => d.kind === 'videoinput');
+            // スイッチボタンの表示制御（1台のみなら非表示）
+            const btn = document.getElementById('switch-btn');
+            if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
+            // 現在使用中のデバイスのインデックスを特定
+            const activeId = stream.getVideoTracks()[0]?.getSettings()?.deviceId;
+            const idx = videoDevices.findIndex(d => d.deviceId === activeId);
+            if (idx !== -1) currentDeviceIndex = idx;
+          });
+          const label = stream.getVideoTracks()[0]?.label || '';
+          setStatus('ready', `QRコードをかざしてください`);
+          requestAnimationFrame(tick);
+        })
+        .catch(err => {
+          console.error('カメラエラー:', err);
+          setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
         });
-        const label = stream.getVideoTracks()[0]?.label || '';
-        setStatus('ready', `QRコードをかざしてください`);
-        requestAnimationFrame(tick);
-      })
-      .catch(err => {
-        console.error('カメラエラー:', err);
-        setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
-      });
+      }, 300); // 前のストリームが解放されるまで300ms待機
     }
 
     // ─────────────────────────────────────────
