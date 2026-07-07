@@ -1,134 +1,324 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>QRコードスキャナー</title>
-  <!-- jsQRライブラリの読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      text-align: center;
-      background-color: #121212;
+      background-color: #0d1117;
       color: #ffffff;
       margin: 0;
-      padding: 0;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      height: 100vh;
-      overflow: hidden;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
     }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #8b949e;
+      margin: 0;
+      letter-spacing: 0.05em;
+    }
+
+    /* カメラ枠 */
     .scanner-container {
       position: relative;
-      width: 90%;
-      max-width: 480px;
+      width: min(90vw, 420px);
       aspect-ratio: 3 / 4;
-      border: 3px solid #007bff;
-      border-radius: 12px;
+      border-radius: 16px;
       overflow: hidden;
-      background-color: #000000;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      background-color: #000;
+      box-shadow: 0 0 0 3px #30363d, 0 12px 40px rgba(0,0,0,0.6);
+      transition: box-shadow 0.15s ease;
     }
+
+    /* スキャン成功フラッシュ */
+    .scanner-container.success-flash {
+      box-shadow: 0 0 0 4px #2ea043, 0 0 40px 10px rgba(46, 160, 67, 0.7);
+    }
+
     video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
-    #status {
-      margin-top: 20px;
-      font-size: 1.1em;
-      font-weight: bold;
-      color: #a0a0a0;
-      min-height: 1.5em;
+
+    /* スキャン成功オーバーレイ */
+    .success-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(46, 160, 67, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.1s ease;
+      pointer-events: none;
+      z-index: 10;
     }
-    /* スキャン用のターゲット枠線 */
+    .success-overlay.visible {
+      opacity: 1;
+    }
+    .success-overlay-icon {
+      font-size: 5rem;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+    }
+
+    /* ガイド枠（中央のスキャンターゲット） */
     .scan-guide {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 200px;
-      height: 200px;
+      width: 55%;
+      aspect-ratio: 1;
       transform: translate(-50%, -50%);
-      border: 2px dashed rgba(255, 255, 255, 0.5);
-      border-radius: 8px;
-      box-sizing: border-box;
+      pointer-events: none;
+      z-index: 5;
+    }
+    /* 四隅の角線 */
+    .scan-guide::before,
+    .scan-guide::after,
+    .scan-guide span::before,
+    .scan-guide span::after {
+      content: '';
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-color: rgba(255,255,255,0.85);
+      border-style: solid;
+    }
+    .scan-guide::before   { top: 0; left: 0;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .scan-guide::after    { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .scan-guide span::before { bottom: 0; left: 0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .scan-guide span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+    /* スキャンライン */
+    .scan-line {
+      position: absolute;
+      left: 5%;
+      width: 90%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #58a6ff, transparent);
+      top: 0;
+      animation: scan 2.4s ease-in-out infinite;
+      z-index: 6;
       pointer-events: none;
     }
+    .scanner-container.cooldown .scan-line {
+      animation: none;
+      display: none;
+    }
+    @keyframes scan {
+      0%   { top: 5%; opacity: 0.8; }
+      50%  { top: 90%; opacity: 1; }
+      100% { top: 5%; opacity: 0.8; }
+    }
+
+    /* ステータスメッセージエリア */
+    #status-area {
+      width: min(90vw, 420px);
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-align: center;
+      background: #161b22;
+      border: 1px solid #30363d;
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    #status-area.ready    { color: #8b949e; }
+    #status-area.success  { color: #2ea043; background: #0d1f12; border-color: #2ea043; font-size: 1.3rem; }
+    #status-area.error    { color: #f85149; background: #1f0d0d; border-color: #f85149; }
+
+    /* カメラ切り替えボタン */
+    #switch-btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #switch-btn:hover { background: #30363d; }
+    #switch-btn:active { background: #3d444d; }
   </style>
 </head>
 <body>
-  <div class="scanner-container">
+  <h1>📷 QRコードスキャナー</h1>
+
+  <div class="scanner-container" id="scanner-container">
     <video id="video-preview" autoplay playsinline muted></video>
-    <div class="scan-guide"></div>
+    <div class="scan-guide"><span></span></div>
+    <div class="scan-line" id="scan-line"></div>
+    <div class="success-overlay" id="success-overlay">
+      <span class="success-overlay-icon">✅</span>
+    </div>
   </div>
-  <div id="status">カメラ起動中...</div>
+
+  <div id="status-area" class="ready">カメラ起動中…</div>
+
+  <button id="switch-btn">🔄 カメラ切り替え</button>
 
   <script>
-    const video = document.getElementById('video-preview');
-    const statusDiv = document.getElementById('status');
-    let scanning = true;
+    const video          = document.getElementById('video-preview');
+    const statusArea     = document.getElementById('status-area');
+    const container      = document.getElementById('scanner-container');
+    const successOverlay = document.getElementById('success-overlay');
 
-    // 1. URLパラメータからカメラの向き（user / environment）を取得
-    const urlParams = new URLSearchParams(window.location.search);
-    const facingMode = urlParams.get('mode') || 'environment'; // デフォルトは背面
+    // URLパラメータからカメラの向きを取得（デフォルト: 背面）
+    const urlParams  = new URLSearchParams(window.location.search);
+    let facingMode   = urlParams.get('mode') || 'environment';
+    let scanning     = false;   // カメラ起動後にtrueになる
+    let cooldown     = false;   // スキャン成功後のクールダウン中はtrue
+    let currentStream = null;
 
-    // 2. 指定されたカメラで起動
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: facingMode,
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+    // ─────────────────────────────────────────
+    // 「ピッ」音の生成（Web Audio API）
+    // ─────────────────────────────────────────
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gainNode   = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1046, ctx.currentTime); // ド（高め）
+        gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.3);
+      } catch(e) {
+        console.warn('Beep failed:', e);
       }
-    })
-    .then(stream => {
-      video.srcObject = stream;
-      video.play();
-      statusDiv.innerText = "QRコードを枠内にかざしてください";
-      requestAnimationFrame(tick);
-    })
-    .catch(err => {
-      console.error("カメラ起動エラー:", err);
-      statusDiv.innerText = "カメラの起動に失敗しました。権限を確認してください。";
-    });
+    }
 
-    // 3. QRコードの解析ループ
+    // ─────────────────────────────────────────
+    // カメラ起動
+    // ─────────────────────────────────────────
+    function startCamera(mode) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+      scanning = false;
+      statusArea.textContent = 'カメラ起動中…';
+      statusArea.className = 'ready';
+
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: mode,
+          width:  { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      })
+      .then(stream => {
+        currentStream = stream;
+        video.srcObject = stream;
+        video.play();
+        scanning = true;
+        setStatus('ready', 'QRコードをかざしてください');
+        requestAnimationFrame(tick);
+      })
+      .catch(err => {
+        console.error('カメラエラー:', err);
+        setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
+      });
+    }
+
+    // ─────────────────────────────────────────
+    // ステータス表示ヘルパー
+    // ─────────────────────────────────────────
+    function setStatus(type, message) {
+      statusArea.className = type;
+      statusArea.textContent = message;
+    }
+
+    // ─────────────────────────────────────────
+    // スキャン成功時の演出
+    // ─────────────────────────────────────────
+    function showSuccessFeedback() {
+      // 枠を緑色に光らせる
+      container.classList.add('success-flash');
+      // オーバーレイ（チェックマーク）を表示
+      successOverlay.classList.add('visible');
+      // ステータスメッセージ
+      setStatus('success', '✅ 受付完了！');
+
+      // 2秒後に通常状態に戻す
+      setTimeout(() => {
+        container.classList.remove('success-flash');
+        successOverlay.classList.remove('visible');
+        cooldown = false;
+        scanning = true;
+        setStatus('ready', 'QRコードをかざしてください');
+        requestAnimationFrame(tick);
+      }, 2000);
+    }
+
+    // ─────────────────────────────────────────
+    // QRコード解析ループ
+    // ─────────────────────────────────────────
+    const canvas  = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
     function tick() {
-      if (!scanning) return;
+      if (!scanning || cooldown) return;
 
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
+        canvas.width  = video.videoWidth;
         canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height);
 
         if (code && code.data) {
           scanning = false;
-          statusDiv.innerText = "読み取り成功！";
+          cooldown = true;
 
-          // 親ウィンドウ（GASアプリ）へデータを返却
+          // ① ピッ音を鳴らす
+          playBeep();
+          // ② 演出を表示
+          showSuccessFeedback();
+          // ③ 親ウィンドウへデータ送信（GASアプリ側へ）
           if (window.opener) {
-            // セキュリティに厳格にする場合は第2引数にGASのWebアプリURLを指定可能
-            window.opener.postMessage({ type: 'qr-result', data: code.data }, "*");
+            window.opener.postMessage({ type: 'qr-result', data: code.data }, '*');
           }
-          
-          // カメラストリームを停止し、タブを閉じる
-          const stream = video.srcObject;
-          if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-          }
-          window.close();
           return;
         }
       }
       requestAnimationFrame(tick);
     }
+
+    // ─────────────────────────────────────────
+    // カメラ切り替えボタン
+    // ─────────────────────────────────────────
+    document.getElementById('switch-btn').addEventListener('click', () => {
+      facingMode = (facingMode === 'environment') ? 'user' : 'environment';
+      cooldown = false;
+      startCamera(facingMode);
+    });
+
+    // ─────────────────────────────────────────
+    // 起動
+    // ─────────────────────────────────────────
+    startCamera(facingMode);
   </script>
 </body>
 </html>
