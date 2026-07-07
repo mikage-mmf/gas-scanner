@@ -233,10 +233,11 @@
       statusArea.textContent = 'カメラ起動中…';
       statusArea.className = 'ready';
 
-      // deviceIdが渡された場合はそれを優先、そうでなければfacingModeで起動
-      const constraint = deviceIdOrMode && deviceIdOrMode.length > 8
-        ? { video: { deviceId: { exact: deviceIdOrMode }, width: { ideal: 1280 }, height: { ideal: 720 } } }
-        : { video: { facingMode: deviceIdOrMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
+      // 'environment'/'user' ならfacingMode、それ以外はdeviceId として扱う
+      const isFacingMode = (!deviceIdOrMode || deviceIdOrMode === 'environment' || deviceIdOrMode === 'user');
+      const constraint = isFacingMode
+        ? { video: { facingMode: deviceIdOrMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { video: { deviceId: { exact: deviceIdOrMode }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
       navigator.mediaDevices.getUserMedia(constraint)
       .then(stream => {
