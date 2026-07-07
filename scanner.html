@@ -179,11 +179,10 @@
   <script>
     // ─────────────────────────────────────────
     // ★★★ 設定エリア ★★★
-    // GASウェブアプリの「デプロイURL」と、スクリプトプロパティに設定した
-    // SCANNER_API_KEY の値をここに入力してください。
+    // GASウェブアプリの「デプロイURL」のみここに設定します。
+    // 認証キーはGASアプリ側から自動的にURLパラメータで渡されます。
     // ─────────────────────────────────────────
-    const GAS_ENDPOINT   = 'https://script.google.com/macros/s/AKfycbxaFVTJpWBk1zBXmRvgFze_fcnehjnJaXi9DfCEby_8wI2LfLUNHfRx5PZOP_4q0-DF/exec';
-    const SCANNER_API_KEY = 'dayservice-scan-1945';
+    const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxaFVTJpWBk1zBXmRvgFze_fcnehjnJaXi9DfCEby_8wI2LfLUNHfRx5PZOP_4q0-DF/exec';
     // ─────────────────────────────────────────
 
     const video          = document.getElementById('video-preview');
@@ -191,12 +190,14 @@
     const container      = document.getElementById('scanner-container');
     const successOverlay = document.getElementById('success-overlay');
 
-    // URLパラメータからカメラの向きを取得（デフォルト: 背面）
+    // URLパラメータからカメラの向き（デフォルト: 背面）と当日キーを取得
     const urlParams  = new URLSearchParams(window.location.search);
     let facingMode   = urlParams.get('mode') || 'environment';
-    let scanning     = false;   // カメラ起動後にtrueになる
-    let cooldown     = false;   // スキャン成功後のクールダウン中はtrue
+    const dailyKey   = urlParams.get('key') || '';  // GASアプリから渡される当日限定キー
+    let scanning     = false;
+    let cooldown     = false;
     let currentStream = null;
+
 
     // ─────────────────────────────────────────
     // 「ピッ」音の生成（Web Audio API）
@@ -320,7 +321,7 @@
       fetch(GAS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' }, // GASのfetch制約上、text/plainを使用
-        body: JSON.stringify({ apiKey: SCANNER_API_KEY, qrCodeId: qrCodeId })
+        body: JSON.stringify({ apiKey: dailyKey, qrCodeId: qrCodeId })
       })
       .then(res => res.json())
       .then(data => {
