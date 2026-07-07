@@ -220,10 +220,12 @@
       }
     }
 
-    // ─────────────────────────────────────────
-    // カメラ起動
-    // ─────────────────────────────────────────
-    function startCamera(mode) {
+    // 利用可能なカメラデバイスのリストと現在のインデックス
+    let videoDevices = [];
+    let currentDeviceIndex = 0;
+
+    // カメラ起動（deviceId指定があればそのデバイス、なければfacingModeで起動）
+    function startCamera(deviceIdOrMode) {
       if (currentStream) {
         currentStream.getTracks().forEach(t => t.stop());
       }
@@ -231,19 +233,30 @@
       statusArea.textContent = 'カメラ起動中…';
       statusArea.className = 'ready';
 
-      navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: mode,
-          width:  { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      })
+      // deviceIdが渡された場合はそれを優先、そうでなければfacingModeで起動
+      const constraint = deviceIdOrMode && deviceIdOrMode.length > 8
+        ? { video: { deviceId: { exact: deviceIdOrMode }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { video: { facingMode: deviceIdOrMode || 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
+
+      navigator.mediaDevices.getUserMedia(constraint)
       .then(stream => {
         currentStream = stream;
         video.srcObject = stream;
         video.play();
         scanning = true;
-        setStatus('ready', 'QRコードをかざしてください');
+        // 起動成功後に利用可能なデバイス一覧を取得（ラベル取得のため許可後に実行）
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          videoDevices = devices.filter(d => d.kind === 'videoinput');
+          // スイッチボタンの表示制御（1台のみなら非表示）
+          const btn = document.getElementById('switch-btn');
+          if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
+          // 現在使用中のデバイスのインデックスを特定
+          const activeId = stream.getVideoTracks()[0]?.getSettings()?.deviceId;
+          const idx = videoDevices.findIndex(d => d.deviceId === activeId);
+          if (idx !== -1) currentDeviceIndex = idx;
+        });
+        const label = stream.getVideoTracks()[0]?.label || '';
+        setStatus('ready', `QRコードをかざしてください`);
         requestAnimationFrame(tick);
       })
       .catch(err => {
@@ -337,12 +350,13 @@
     }
 
     // ─────────────────────────────────────────
-    // カメラ切り替えボタン
+    // カメラ切り替えボタン（接続されたカメラを順番に循環）
     // ─────────────────────────────────────────
     document.getElementById('switch-btn').addEventListener('click', () => {
-      facingMode = (facingMode === 'environment') ? 'user' : 'environment';
+      if (videoDevices.length <= 1) return;
       cooldown = false;
-      startCamera(facingMode);
+      currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+      startCamera(videoDevices[currentDeviceIndex].deviceId);
     });
 
     // ─────────────────────────────────────────
