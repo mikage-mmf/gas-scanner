@@ -144,9 +144,11 @@
     #status-area.ready    { color: #8b949e; }
     #status-area.success  { color: #2ea043; background: #0d1f12; border-color: #2ea043; font-size: 1.3rem; }
     #status-area.error    { color: #f85149; background: #1f0d0d; border-color: #f85149; }
+    #status-area.info     { color: #58a6ff; background: #0d1b2a; border-color: #1f6feb; font-weight: 400; font-size: 0.95rem; }
 
     /* カメラ切り替えボタン */
     #switch-btn {
+      width: min(90vw, 420px);
       background: #21262d;
       color: #c9d1d9;
       border: 1px solid #30363d;
@@ -278,10 +280,25 @@
         .catch(err => {
           console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
           if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
-          if (err.name === 'NotReadableError') {
-            setStatus('error', '⚠️ このカメラは他のアプリが使用中です。\nPoly Camera Pro等の仮想カメラソフトを終了してから\nページを再読み込みしてください。');
+          if (err.name === 'NotReadableError' && videoDevices.length > 1) {
+            // 使用中のカメラをスキップして次のデバイスを試す
+            const tried = new Set();
+            tried.add(currentDeviceIndex);
+            let nextIndex = (currentDeviceIndex + 1) % videoDevices.length;
+            if (!tried.has(nextIndex)) {
+              console.log(`[Camera] NotReadableError: 次のデバイス[${nextIndex}]へスキップ`);
+              setStatus('info', 'ℹ️ このカメラは別のアプリが使用中のためスキップします');
+              currentDeviceIndex = nextIndex;
+              setTimeout(() => startCamera(videoDevices[currentDeviceIndex].deviceId), 400);
+            } else {
+              setStatus('info', 'ℹ️ 利用可能なカメラが見つかりませんでした');
+            }
+          } else if (err.name === 'NotReadableError') {
+            setStatus('info', 'ℹ️ このカメラは別のアプリが使用中です。
+Poly Camera Pro等を終了してページを再読み込みしてください。');
           } else {
-            setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
+            setStatus('error', 'カメラの起動に失敗しました。
+権限を確認してください。');
           }
         });
       }, 300);
