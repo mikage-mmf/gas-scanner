@@ -281,18 +281,21 @@
           console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
           if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
           if (err.name === 'NotReadableError' && videoDevices.length > 1) {
-            // 使用中のカメラをスキップして次のデバイスを試す
-            const tried = new Set();
-            tried.add(currentDeviceIndex);
-            let nextIndex = (currentDeviceIndex + 1) % videoDevices.length;
-            if (!tried.has(nextIndex)) {
-              console.log(`[Camera] NotReadableError: 次のデバイス[${nextIndex}]へスキップ`);
-              setStatus('info', 'ℹ️ このカメラは別のアプリが使用中のためスキップします');
-              currentDeviceIndex = nextIndex;
-              setTimeout(() => startCamera(videoDevices[currentDeviceIndex].deviceId), 400);
-            } else {
-              setStatus('info', 'ℹ️ 利用可能なカメラが見つかりませんでした');
-            }
+            // カウントダウン付きで次のデバイスへ自動スキップ
+            const nextIndex = (currentDeviceIndex + 1) % videoDevices.length;
+            let count = 3;
+            setStatus('info', `ℹ️ このカメラは別のアプリが使用中です\n${count}秒後に次のカメラへ切り替えます...`);
+            const timer = setInterval(() => {
+              count--;
+              if (count > 0) {
+                setStatus('info', `ℹ️ このカメラは別のアプリが使用中です\n${count}秒後に次のカメラへ切り替えます...`);
+              } else {
+                clearInterval(timer);
+                currentDeviceIndex = nextIndex;
+                console.log(`[Camera] カウントダウン完了: デバイス[${nextIndex}]へスキップ`);
+                startCamera(videoDevices[currentDeviceIndex].deviceId);
+              }
+            }, 1000);
           } else if (err.name === 'NotReadableError') {
             setStatus('info', 'ℹ️ このカメラは別のアプリが使用中です。\nPoly Camera Pro等を終了してページを再読み込みしてください。');
           } else {
