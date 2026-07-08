@@ -294,11 +294,9 @@
               setStatus('info', 'ℹ️ 利用可能なカメラが見つかりませんでした');
             }
           } else if (err.name === 'NotReadableError') {
-            setStatus('info', 'ℹ️ このカメラは別のアプリが使用中です。
-Poly Camera Pro等を終了してページを再読み込みしてください。');
+            setStatus('info', 'ℹ️ このカメラは別のアプリが使用中です。\nPoly Camera Pro等を終了してページを再読み込みしてください。');
           } else {
-            setStatus('error', 'カメラの起動に失敗しました。
-権限を確認してください。');
+            setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
           }
         });
       }, 300);
