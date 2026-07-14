@@ -137,8 +137,10 @@
       border: 1px solid #30363d;
       min-height: 56px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 8px;
       transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     #status-area.ready    { color: #8b949e; }
@@ -225,12 +227,25 @@
     // 利用可能なカメラデバイスのリストと現在のインデックス
     let videoDevices = [];
     let currentDeviceIndex = 0;
+    let attemptCycleDevices = new Set();
+    let switchTimer = null;
 
     // カメラ起動（deviceId指定があればそのデバイス、なければfacingModeで起動）
-    function startCamera(deviceIdOrMode) {
-      console.log(`[Camera] startCamera() 呼び出し。引数: "${deviceIdOrMode}"`);
+    function startCamera(deviceIdOrMode, isManual = false) {
+      console.log(`[Camera] startCamera() 呼び出し。引数: "${deviceIdOrMode}", isManual: ${isManual}`);
       console.log(`[Camera] 現在のvideoDevices一覧:`, videoDevices.map((d, i) => `[${i}] ${d.label} (${d.deviceId.substring(0,8)}…)`));
       console.log(`[Camera] currentDeviceIndex: ${currentDeviceIndex}`);
+
+      // 進行中の切り替えタイマーがあればキャンセル
+      if (switchTimer) {
+        console.log('[Camera] 進行中の自動切り替えタイマーをクリアします。');
+        clearInterval(switchTimer);
+        switchTimer = null;
+      }
+
+      if (isManual) {
+        attemptCycleDevices.clear();
+      }
 
       if (currentStream) {
         console.log('[Camera] 既存ストリームを停止中…');
@@ -241,8 +256,13 @@
         currentStream = null;
       }
       scanning = false;
-      statusArea.textContent = 'カメラ起動中…';
-      statusArea.className = 'ready';
+      setStatus('ready', 'カメラ起動中…');
+
+      // ブラウザ互換性チェック
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus('error', '❌ お使いのブラウザはカメラ機能をサポートしていないか、安全な接続（HTTPS）ではありません。');
+        return;
+      }
 
       // 'environment'/'user' ならfacingMode、それ以外はdeviceId として扱う
       const isFacingMode = (!deviceIdOrMode || deviceIdOrMode === 'environment' || deviceIdOrMode === 'user');
@@ -259,59 +279,116 @@
         .then(stream => {
           currentStream = stream;
           const track = stream.getVideoTracks()[0];
-          console.log(`[Camera] ✅ 起動成功: "${track?.label}", deviceId: ${track?.getSettings()?.deviceId?.substring(0,12)}…`);
+          const activeId = track?.getSettings()?.deviceId;
+          console.log(`[Camera] ✅ 起動成功: "${track?.label}", deviceId: ${activeId?.substring(0,12)}…`);
           video.srcObject = stream;
           video.play();
           scanning = true;
+
+          // 正常起動したので失敗サイクルをクリア
+          attemptCycleDevices.clear();
+
           // 起動成功後に利用可能なデバイス一覧を更新
           navigator.mediaDevices.enumerateDevices().then(devices => {
             videoDevices = devices.filter(d => d.kind === 'videoinput');
             console.log('[Camera] 利用可能なカメラ一覧:', videoDevices.map((d, i) => `[${i}] ${d.label}`));
             const btn = document.getElementById('switch-btn');
             if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
-            const activeId = track?.getSettings()?.deviceId;
-            const idx = videoDevices.findIndex(d => d.deviceId === activeId);
-            if (idx !== -1) currentDeviceIndex = idx;
+            if (activeId) {
+              const idx = videoDevices.findIndex(d => d.deviceId === activeId);
+              if (idx !== -1) currentDeviceIndex = idx;
+            }
             console.log(`[Camera] activeDeviceIndex: ${currentDeviceIndex}`);
           });
           setStatus('ready', 'QRコードをかざしてください');
           requestAnimationFrame(tick);
         })
-        .catch(err => {
+        .catch(async err => {
           console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
           if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
-          if (err.name === 'NotReadableError' && videoDevices.length > 1) {
-            // カウントダウン付きで次のデバイスへ自動スキップ
-            const nextIndex = (currentDeviceIndex + 1) % videoDevices.length;
-            let count = 3;
-            setStatus('info', `ℹ️ このカメラは別のアプリが使用中です\n${count}秒後に次のカメラへ切り替えます...`);
-            const timer = setInterval(() => {
-              count--;
-              if (count > 0) {
-                setStatus('info', `ℹ️ このカメラは別のアプリが使用中です\n${count}秒後に次のカメラへ切り替えます...`);
-              } else {
-                clearInterval(timer);
-                currentDeviceIndex = nextIndex;
-                console.log(`[Camera] カウントダウン完了: デバイス[${nextIndex}]へスキップ`);
-                startCamera(videoDevices[currentDeviceIndex].deviceId);
-              }
-            }, 1000);
-          } else if (err.name === 'NotReadableError') {
-            setStatus('info', 'ℹ️ このカメラは別のアプリが使用中です。\nPoly Camera Pro等を終了してページを再読み込みしてください。');
+
+          // エラー時でも最新のデバイス一覧取得を試みる
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const btn = document.getElementById('switch-btn');
+            if (btn) btn.style.display = videoDevices.length <= 1 ? 'none' : '';
+          } catch (e) {
+            console.error('[Camera] デバイス一覧の更新失敗:', e);
+          }
+
+          // 現在試みて失敗したカメラの名前・IDを特定
+          let failedLabel = 'カメラ';
+          let failedDeviceId = null;
+          if (videoDevices.length > 0 && currentDeviceIndex < videoDevices.length) {
+            failedLabel = videoDevices[currentDeviceIndex].label || `カメラ #${currentDeviceIndex + 1}`;
+            failedDeviceId = videoDevices[currentDeviceIndex].deviceId;
           } else {
-            setStatus('error', 'カメラの起動に失敗しました。\n権限を確認してください。');
+            failedLabel = isFacingMode ? (deviceIdOrMode === 'user' ? 'インカメラ' : '背面カメラ') : '指定されたカメラ';
+          }
+
+          // 失敗したカメラを記録
+          if (failedDeviceId) {
+            attemptCycleDevices.add(failedDeviceId);
+          } else {
+            attemptCycleDevices.add(deviceIdOrMode);
+          }
+
+          if (err.name === 'NotReadableError') {
+            // 他のカメラが利用可能かチェック
+            const nextIndex = (currentDeviceIndex + 1) % videoDevices.length;
+            const nextDevice = videoDevices[nextIndex];
+            
+            // 次のカメラも既に失敗している、または他にカメラがない場合（無限ループ防止）
+            if (videoDevices.length <= 1 || (nextDevice && attemptCycleDevices.has(nextDevice.deviceId))) {
+              console.warn('[Camera] すべてのカメラが失敗したか、切り替え先がありません。自動切り替えを停止します。');
+              const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">🔄 再試行</button></div>`;
+              setStatus('error', `❌ すべてのカメラの起動に失敗しました。\n「${failedLabel}」が他のアプリで起動中か、接続に問題があります。`, retryBtnHtml);
+            } else {
+              // カウントダウン付きで次のデバイスへ自動スキップ
+              const nextLabel = nextDevice.label || `カメラ #${nextIndex + 1}`;
+              let count = 3;
+              setStatus('info', `ℹ️ 「${failedLabel}」は別のアプリが使用中か、起動できません。\n${count}秒後に「${nextLabel}」へ切り替えます...`);
+              
+              switchTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                  setStatus('info', `ℹ️ 「${failedLabel}」は別のアプリが使用中か、起動できません。\n${count}秒後に「${nextLabel}」へ切り替えます...`);
+                } else {
+                  clearInterval(switchTimer);
+                  switchTimer = null;
+                  currentDeviceIndex = nextIndex;
+                  console.log(`[Camera] カウントダウン完了: デバイス[${nextIndex}] (${nextLabel}) へスキップ`);
+                  startCamera(nextDevice.deviceId);
+                }
+              }, 1000);
+            }
+          } else {
+            // 権限エラーやその他のエラー
+            const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">🔄 再試行</button></div>`;
+            setStatus('error', `❌ カメラ「${failedLabel}」の起動に失敗しました。\n権限設定を確認してください。`, retryBtnHtml);
           }
         });
       }, 300);
     }
 
+    // カメラ起動の再試行用（グローバルスコープに配置）
+    function retryCamera() {
+      console.log('[Camera] 再試行ボタンが押されました。履歴をクリアして再起動します。');
+      const targetId = (videoDevices.length > 0 && videoDevices[currentDeviceIndex])
+        ? videoDevices[currentDeviceIndex].deviceId
+        : facingMode;
+      startCamera(targetId, true);
+    }
+    window.retryCamera = retryCamera;
+
 
     // ─────────────────────────────────────────
     // ステータス表示ヘルパー
     // ─────────────────────────────────────────
-    function setStatus(type, message) {
+    function setStatus(type, message, htmlContent = '') {
       statusArea.className = type;
-      statusArea.textContent = message;
+      statusArea.innerHTML = message.replace(/\n/g, '<br>') + htmlContent;
     }
 
     // ─────────────────────────────────────────
@@ -397,7 +474,7 @@
       if (videoDevices.length <= 1) return;
       cooldown = false;
       currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-      startCamera(videoDevices[currentDeviceIndex].deviceId);
+      startCamera(videoDevices[currentDeviceIndex].deviceId, true);
     });
 
     // ─────────────────────────────────────────
