@@ -421,7 +421,7 @@
     // QRコード解析ループ
     // ─────────────────────────────────────────
     const canvas  = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
 
     function tick() {
       if (!scanning || cooldown) return;
