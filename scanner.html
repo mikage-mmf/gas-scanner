@@ -18,11 +18,14 @@
       color: #ffffff;
       margin: 0;
       padding: 16px;
+      /* 画面全体をビューポートに完全ロック */
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+      justify-content: space-between; /* 上下均等に分散配置 */
       gap: 16px;
     }
 
@@ -32,12 +35,26 @@
       color: #8b949e;
       margin: 0;
       letter-spacing: 0.05em;
+      flex-shrink: 0; /* ヘッダーは絶対に縮めない */
+    }
+
+    /* カメラ枠のラッパー: 余白スペースをすべてこのエリアが吸収する */
+    .scanner-wrapper {
+      flex: 1; /* 余った高さをすべて占有 */
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0; /* Flexbox内で中の要素が自動的に縮むために極めて重要 */
     }
 
     /* カメラ枠 */
     .scanner-container {
       position: relative;
-      width: min(90vw, 420px);
+      /* ラッパーのサイズに追従しつつ、アスペクト比 3:4 を保つ */
+      width: 100%;
+      height: 100%;
+      max-width: 420px;
       aspect-ratio: 3 / 4;
       border-radius: 16px;
       overflow: hidden;
@@ -129,32 +146,44 @@
       100% { top: 5%; opacity: 0.8; }
     }
 
+    /* 下部コントロールエリア */
+    .control-panel {
+      width: min(90vw, 420px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-shrink: 0; /* コントロールエリアは絶対に縮めない */
+    }
+
     /* ステータスメッセージエリア */
     #status-area {
-      width: min(90vw, 420px);
+      width: 100%;
+      height: 76px; /* 高さを完全固定 */
+      flex-shrink: 0;
       border-radius: 12px;
-      padding: 14px 20px;
-      font-size: 1.05rem;
+      padding: 8px 16px;
+      font-size: 1rem;
       font-weight: 700;
       text-align: center;
       background: #161b22;
       border: 1px solid #30363d;
-      min-height: 56px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 4px;
+      overflow-y: auto; /* 万が一、極端に長いメッセージが入った場合は内側でスクロール */
+      word-break: break-all;
       transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     #status-area.ready    { color: #8b949e; }
-    #status-area.success  { color: #2ea043; background: #0d1f12; border-color: #2ea043; font-size: 1.3rem; }
+    #status-area.success  { color: #2ea043; background: #0d1f12; border-color: #2ea043; font-size: 1.15rem; }
     #status-area.error    { color: #f85149; background: #1f0d0d; border-color: #f85149; }
     #status-area.info     { color: #58a6ff; background: #0d1b2a; border-color: #1f6feb; font-weight: 400; font-size: 0.95rem; }
 
     /* カメラ切り替えボタン */
     #switch-btn {
-      width: min(90vw, 420px);
+      width: 100%;
       background: #21262d;
       color: #c9d1d9;
       border: 1px solid #30363d;
@@ -162,7 +191,9 @@
       padding: 10px 24px;
       font-size: 0.9rem;
       cursor: pointer;
+      height: 44px; /* ボタン高さも固定化 */
       transition: background 0.15s;
+      flex-shrink: 0;
     }
     #switch-btn:hover { background: #30363d; }
     #switch-btn:active { background: #3d444d; }
@@ -198,21 +229,26 @@
 <body>
   <h1>📷 QRコードスキャナー</h1>
 
-  <div class="scanner-container" id="scanner-container">
-    <video id="video-preview" autoplay playsinline muted></video>
-    <div class="scan-guide"><span></span></div>
-    <div class="scan-line" id="scan-line"></div>
-    <div class="success-overlay" id="success-overlay">
-      <div class="success-content">
-        <span class="success-overlay-icon">✅</span>
-        <div id="overlay-service-name" class="overlay-service-name"></div>
+  <!-- カメラ枠ラッパー -->
+  <div class="scanner-wrapper">
+    <div class="scanner-container" id="scanner-container">
+      <video id="video-preview" autoplay playsinline muted></video>
+      <div class="scan-guide"><span></span></div>
+      <div class="scan-line" id="scan-line"></div>
+      <div class="success-overlay" id="success-overlay">
+        <div class="success-content">
+          <span class="success-overlay-icon">✅</span>
+          <div id="overlay-service-name" class="overlay-service-name"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="status-area" class="ready"></div>
-
-  <button id="switch-btn">🔄 カメラ切り替え</button>
+  <!-- 下部コントロールパネル -->
+  <div class="control-panel">
+    <div id="status-area" class="ready"></div>
+    <button id="switch-btn">🔄 カメラ切り替え</button>
+  </div>
 
   <script>
     // ─────────────────────────────────────────
