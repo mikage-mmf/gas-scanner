@@ -166,6 +166,33 @@
     }
     #switch-btn:hover { background: #30363d; }
     #switch-btn:active { background: #3d444d; }
+
+    /* スキャン成功オーバーレイ内のコンテンツ配置 */
+    .success-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 0 16px;
+    }
+    /* 事業所名の表示スタイル（ふわっと表示） */
+    .overlay-service-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      word-break: break-all;
+    }
+    .overlay-service-name.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -176,7 +203,10 @@
     <div class="scan-guide"><span></span></div>
     <div class="scan-line" id="scan-line"></div>
     <div class="success-overlay" id="success-overlay">
-      <span class="success-overlay-icon">✅</span>
+      <div class="success-content">
+        <span class="success-overlay-icon">✅</span>
+        <div id="overlay-service-name" class="overlay-service-name"></div>
+      </div>
     </div>
   </div>
 
@@ -473,23 +503,40 @@
     // ─────────────────────────────────────────
     // スキャン成功時の演出
     // ─────────────────────────────────────────
+    let resetTimer = null;
+
     function showSuccessFeedback() {
+      if (resetTimer) clearTimeout(resetTimer);
+
       // 枠を緑色に光らせる
       container.classList.add('success-flash');
       // オーバーレイ（チェックマーク）を表示
       successOverlay.classList.add('visible');
+      // 事業所名表示をクリア＆非表示にしておく
+      const serviceNameEl = document.getElementById('overlay-service-name');
+      if (serviceNameEl) {
+        serviceNameEl.textContent = '';
+        serviceNameEl.classList.remove('visible');
+      }
       // ステータスメッセージ
       setStatus('success', dict.successMessage);
+    }
 
-      // 2秒後に通常状態に戻す
-      setTimeout(() => {
+    function resetScannerDelay(delayMs) {
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
         container.classList.remove('success-flash');
         successOverlay.classList.remove('visible');
+        const serviceNameEl = document.getElementById('overlay-service-name');
+        if (serviceNameEl) {
+          serviceNameEl.textContent = '';
+          serviceNameEl.classList.remove('visible');
+        }
         cooldown = false;
         scanning = true;
         setStatus('ready', dict.scanMessage);
         requestAnimationFrame(tick);
-      }, 2000);
+      }, delayMs);
     }
 
     // ─────────────────────────────────────────
@@ -537,12 +584,37 @@
       .then(data => {
         if (!data.success) {
           console.warn('[Scanner] GASエラー:', data.message);
-          // エラーの場合はステータスに表示（演出後2秒で上書きされる）
+          // エラーの場合は演出を解除してエラー表示にする
+          container.classList.remove('success-flash');
+          successOverlay.classList.remove('visible');
+          setStatus('error', data.message);
+          // エラー時は確認しやすいように3秒後にリセット
+          resetScannerDelay(3000);
+        } else {
+          console.log('[Scanner] GAS応答:', data.message);
+          // 成功時：事業所名を取得して表示
+          const serviceName = data.updatedService ? data.updatedService.name : '';
+          if (serviceName) {
+            // ステータスエリアを更新（事業所名を追加）
+            setStatus('success', `${dict.successMessage}<br><span style="font-size: 0.95rem; font-weight: normal; color: #8b949e;">${serviceName}</span>`);
+            
+            // オーバーレイ内にも表示
+            const serviceNameEl = document.getElementById('overlay-service-name');
+            if (serviceNameEl) {
+              serviceNameEl.textContent = serviceName;
+              serviceNameEl.classList.add('visible');
+            }
+          }
+          // レスポンスが返ってから2秒間表示を維持する
+          resetScannerDelay(2000);
         }
-        console.log('[Scanner] GAS応答:', data.message);
       })
       .catch(err => {
         console.error('[Scanner] 送信失敗:', err);
+        container.classList.remove('success-flash');
+        successOverlay.classList.remove('visible');
+        setStatus('error', '通信エラーが発生しました。接続を確認してください。');
+        resetScannerDelay(3000);
       });
     }
 
