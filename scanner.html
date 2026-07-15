@@ -180,7 +180,7 @@
     </div>
   </div>
 
-  <div id="status-area" class="ready">カメラ起動中…</div>
+  <div id="status-area" class="ready"></div>
 
   <button id="switch-btn">🔄 カメラ切り替え</button>
 
@@ -198,10 +198,85 @@
     const container      = document.getElementById('scanner-container');
     const successOverlay = document.getElementById('success-overlay');
 
-    // URLパラメータからカメラの向き（デフォルト: 背面）と当日キーを取得
+    const ScannerTranslations = {
+      ja: {
+        title: "📷 QRコードスキャナー",
+        loading: "カメラ起動中…",
+        scanMessage: "QRコードをかざしてください",
+        successMessage: "✅ 受付完了！",
+        switchBtn: "🔄 カメラ切り替え",
+        retryBtn: "🔄 再試行",
+        unsupportedBrowser: "❌ お使いのブラウザはカメラ機能をサポートしていないか、安全な接続（HTTPS）ではありません。",
+        failedInCamera: "インカメラ",
+        failedOutCamera: "背面カメラ",
+        failedSpecifiedCamera: "指定されたカメラ",
+        otherAppRunning: "ℹ️ 「{failedLabel}」は別のアプリが使用中か、起動できません。\n{count}秒後に「{nextLabel}」へ切り替えます...",
+        allCameraFailed: "❌ すべてのカメラの起動に失敗しました。\n「{failedLabel}」が他のアプリで起動中か、接続に問題があります。",
+        cameraInitFailed: "❌ カメラ「{failedLabel}」の起動に失敗しました。\n権限設定を確認してください。"
+      },
+      en: {
+        title: "📷 QR Code Scanner",
+        loading: "Starting camera...",
+        scanMessage: "Please scan the QR code",
+        successMessage: "✅ Checked in!",
+        switchBtn: "🔄 Switch Camera",
+        retryBtn: "🔄 Retry",
+        unsupportedBrowser: "❌ Your browser does not support camera functions or it is not a secure connection (HTTPS).",
+        failedInCamera: "Front Camera",
+        failedOutCamera: "Rear Camera",
+        failedSpecifiedCamera: "Specified Camera",
+        otherAppRunning: "ℹ️ \"{failedLabel}\" is in use by another app or cannot start.\nSwitching to \"{nextLabel}\" in {count}s...",
+        allCameraFailed: "❌ Failed to start all cameras.\n\"{failedLabel}\" might be in use by another app or has connection issues.",
+        cameraInitFailed: "❌ Failed to start camera \"{failedLabel}\"\nPlease check permission settings."
+      },
+      es: {
+        title: "📷 Escáner de Código QR",
+        loading: "Iniciando cámara...",
+        scanMessage: "Por favor, escanee el código QR",
+        successMessage: "✅ ¡Registrado!",
+        switchBtn: "🔄 Cambiar Cámara",
+        retryBtn: "🔄 Reintentar",
+        unsupportedBrowser: "❌ Su navegador no admite funciones de cámara o no es una conexión segura (HTTPS).",
+        failedInCamera: "Cámara frontal",
+        failedOutCamera: "Cámara trasera",
+        failedSpecifiedCamera: "Cámara especificada",
+        otherAppRunning: "ℹ️ \"{failedLabel}\" está en uso por otra aplicación o no se puede iniciar.\nCambiando a \"{nextLabel}\" en {count}s...",
+        allCameraFailed: "❌ No se pudieron iniciar todas las cámaras.\n\"{failedLabel}\" podría estar en uso por otra aplicación o tener problemas de conexión.",
+        cameraInitFailed: "❌ No se pudo iniciar la cámara \"{failedLabel}\"\nPor favor, verifique la configuración de permisos."
+      },
+      zh: {
+        title: "📷 二维码扫描仪",
+        loading: "正在启动摄像头...",
+        scanMessage: "请对准二维码进行扫描",
+        successMessage: "✅ 签到成功！",
+        switchBtn: "🔄 切换摄像头",
+        retryBtn: "🔄 重试",
+        unsupportedBrowser: "❌ 您的浏览器不支持摄像头功能或不是安全连接（HTTPS）。",
+        failedInCamera: "前置摄像头",
+        failedOutCamera: "后置摄像头",
+        failedSpecifiedCamera: "指定的摄像头",
+        otherAppRunning: "ℹ️ \"{failedLabel}\" 正在被其他应用使用或无法启动。\n将在 {count} 秒后切换到 \"{nextLabel}\"...",
+        allCameraFailed: "❌ 无法启动所有摄像头。\n\"{failedLabel}\" 可能正被其他应用使用，或存在连接问题。",
+        cameraInitFailed: "❌ 无法启动摄像头 \"{failedLabel}\"\n请检查权限设置。"
+      }
+    };
+
+    // URLパラメータからカメラの向き（デフォルト: 背面）、当日キー、言語を取得
     const urlParams  = new URLSearchParams(window.location.search);
     let facingMode   = urlParams.get('mode') || 'environment';
     const dailyKey   = urlParams.get('key') || '';  // GASアプリから渡される当日限定キー
+    const lang       = urlParams.get('lang') || 'ja';
+    const dict       = ScannerTranslations[lang] || ScannerTranslations.ja;
+
+    // 初期表示と言語の適用
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelector('h1').textContent = dict.title;
+      document.title = dict.title.replace('📷 ', '');
+      const switchBtn = document.getElementById('switch-btn');
+      if (switchBtn) switchBtn.textContent = dict.switchBtn;
+      const statusArea = document.getElementById('status-area');
+      if (statusArea) statusArea.textContent = dict.loading;
+    });
     let scanning     = false;
     let cooldown     = false;
     let currentStream = null;
@@ -260,11 +335,11 @@
         currentStream = null;
       }
       scanning = false;
-      setStatus('ready', 'カメラ起動中…');
+      setStatus('ready', dict.loading);
 
       // ブラウザ互換性チェック
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('error', '❌ お使いのブラウザはカメラ機能をサポートしていないか、安全な接続（HTTPS）ではありません。');
+        setStatus('error', dict.unsupportedBrowser);
         return;
       }
 
@@ -304,7 +379,7 @@
             }
             console.log(`[Camera] activeDeviceIndex: ${currentDeviceIndex}`);
           });
-          setStatus('ready', 'QRコードをかざしてください');
+          setStatus('ready', dict.scanMessage);
           requestAnimationFrame(tick);
         })
         .catch(async err => {
@@ -328,7 +403,7 @@
             failedLabel = videoDevices[currentDeviceIndex].label || `カメラ #${currentDeviceIndex + 1}`;
             failedDeviceId = videoDevices[currentDeviceIndex].deviceId;
           } else {
-            failedLabel = isFacingMode ? (deviceIdOrMode === 'user' ? 'インカメラ' : '背面カメラ') : '指定されたカメラ';
+            failedLabel = isFacingMode ? (deviceIdOrMode === 'user' ? dict.failedInCamera : dict.failedOutCamera) : dict.failedSpecifiedCamera;
           }
 
           // 失敗したカメラを記録
@@ -346,18 +421,18 @@
             // 次のカメラも既に失敗している、または他にカメラがない場合（無限ループ防止）
             if (videoDevices.length <= 1 || (nextDevice && attemptCycleDevices.has(nextDevice.deviceId))) {
               console.warn('[Camera] すべてのカメラが失敗したか、切り替え先がありません。自動切り替えを停止します。');
-              const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">🔄 再試行</button></div>`;
-              setStatus('error', `❌ すべてのカメラの起動に失敗しました。\n「${failedLabel}」が他のアプリで起動中か、接続に問題があります。`, retryBtnHtml);
+              const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">${dict.retryBtn}</button></div>`;
+              setStatus('error', dict.allCameraFailed.replace('{failedLabel}', failedLabel), retryBtnHtml);
             } else {
               // カウントダウン付きで次のデバイスへ自動スキップ
               const nextLabel = nextDevice.label || `カメラ #${nextIndex + 1}`;
               let count = 3;
-              setStatus('info', `ℹ️ 「${failedLabel}」は別のアプリが使用中か、起動できません。\n${count}秒後に「${nextLabel}」へ切り替えます...`);
+              setStatus('info', dict.otherAppRunning.replace('{failedLabel}', failedLabel).replace('{count}', count).replace('{nextLabel}', nextLabel));
               
               switchTimer = setInterval(() => {
                 count--;
                 if (count > 0) {
-                  setStatus('info', `ℹ️ 「${failedLabel}」は別のアプリが使用中か、起動できません。\n${count}秒後に「${nextLabel}」へ切り替えます...`);
+                  setStatus('info', dict.otherAppRunning.replace('{failedLabel}', failedLabel).replace('{count}', count).replace('{nextLabel}', nextLabel));
                 } else {
                   clearInterval(switchTimer);
                   switchTimer = null;
@@ -369,8 +444,8 @@
             }
           } else {
             // 権限エラーやその他のエラー
-            const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">🔄 再試行</button></div>`;
-            setStatus('error', `❌ カメラ「${failedLabel}」の起動に失敗しました。\n権限設定を確認してください。`, retryBtnHtml);
+            const retryBtnHtml = `<div style="margin-top: 8px;"><button onclick="retryCamera()" style="background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 4px;">${dict.retryBtn}</button></div>`;
+            setStatus('error', dict.cameraInitFailed.replace('{failedLabel}', failedLabel), retryBtnHtml);
           }
         });
       }, 300);
@@ -404,7 +479,7 @@
       // オーバーレイ（チェックマーク）を表示
       successOverlay.classList.add('visible');
       // ステータスメッセージ
-      setStatus('success', '✅ 受付完了！');
+      setStatus('success', dict.successMessage);
 
       // 2秒後に通常状態に戻す
       setTimeout(() => {
@@ -412,7 +487,7 @@
         successOverlay.classList.remove('visible');
         cooldown = false;
         scanning = true;
-        setStatus('ready', 'QRコードをかざしてください');
+        setStatus('ready', dict.scanMessage);
         requestAnimationFrame(tick);
       }, 2000);
     }
