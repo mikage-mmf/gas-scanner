@@ -224,6 +224,69 @@
       opacity: 1;
       transform: translateY(0);
     }
+
+    /* 汎用ローディングスピナー (Global Loading Spinner) */
+    .global-loader-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      width: 100%;
+      height: 100%;
+      padding: 24px;
+      box-sizing: border-box;
+      background-color: #000000;
+      z-index: 8; /* videoの上、success-overlayの下 */
+      transition: opacity 0.3s ease;
+    }
+
+    .global-loader-spinner {
+      position: relative;
+      width: 48px;
+      height: 48px;
+    }
+
+    .global-loader-spinner::before,
+    .global-loader-spinner::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: #58a6ff;
+      animation: global-loader-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    }
+
+    .global-loader-spinner::after {
+      animation-delay: -0.4s;
+      border-top-color: rgba(88, 166, 255, 0.35);
+    }
+
+    .global-loader-text {
+      font-size: 1rem;
+      color: #8b949e;
+      font-weight: 500;
+      margin: 0;
+      text-align: center;
+      letter-spacing: 0.05em;
+      animation: global-loader-pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes global-loader-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes global-loader-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -233,6 +296,12 @@
   <div class="scanner-wrapper">
     <div class="scanner-container" id="scanner-container">
       <video id="video-preview" autoplay playsinline muted></video>
+      <!-- ▼▼▼ [追加] ローディング表示 (共通スピナー適用) ▼▼▼ -->
+      <div id="loading-container" class="global-loader-container">
+        <div class="global-loader-spinner"></div>
+        <p id="loading-message" class="global-loader-text">Loading...</p>
+      </div>
+      <!-- ▲▲▲ 追加ここまで ▲▲▲ -->
       <div class="scan-guide"><span></span></div>
       <div class="scan-line" id="scan-line"></div>
       <div class="success-overlay" id="success-overlay">
@@ -403,9 +472,18 @@
       scanning = false;
       setStatus('ready', dict.loading);
 
+      // ▼▼▼ [追加] ローディングスピナー表示 ▼▼▼
+      const loadingContainer = document.getElementById('loading-container');
+      const loadingMsg = document.getElementById('loading-message');
+      if (loadingContainer) loadingContainer.style.display = 'flex';
+      if (loadingMsg) loadingMsg.textContent = dict.loading;
+      // ▲▲▲ 追加ここまで ▲▲▲
+
       // ブラウザ互換性チェック
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setStatus('error', dict.unsupportedBrowser);
+        // 互換性なしエラー時はスピナーを隠す
+        if (loadingContainer) loadingContainer.style.display = 'none';
         return;
       }
 
@@ -445,10 +523,20 @@
             }
             console.log(`[Camera] activeDeviceIndex: ${currentDeviceIndex}`);
           });
+
+          // ▼▼▼ [追加] 起動成功したのでスピナー非表示 ▼▼▼
+          if (loadingContainer) loadingContainer.style.display = 'none';
+          // ▲▲▲ 追加ここまで ▲▲▲
+
           setStatus('ready', dict.scanMessage);
           requestAnimationFrame(tick);
         })
         .catch(async err => {
+          // ▼▼▼ [追加] 起動失敗したのでスピナー非表示 ▼▼▼
+          const loadingContainer = document.getElementById('loading-container');
+          if (loadingContainer) loadingContainer.style.display = 'none';
+          // ▲▲▲ 追加ここまで ▲▲▲
+
           console.error(`[Camera] ❌ エラー: ${err.name} - ${err.message}`);
           if (err.constraint) console.error('[Camera] 違反したconstraint:', err.constraint);
 
