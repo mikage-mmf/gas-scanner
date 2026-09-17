@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>図書バーコードスキャナー (Camera Scanner)</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- html5-qrcode (フォールバック付き) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      gap: 12px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    header {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+      flex-shrink: 0;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-group h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-target {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    /* カメラ枠ラッパー */
+    .scanner-wrapper {
+      flex: 1;
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      position: relative;
+    }
+
+    .scanner-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background-color: #000;
+      box-shadow: 0 0 0 3px #334155, 0 16px 40px rgba(0, 0, 0, 0.6);
+      transition: box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scanner-container.success-flash {
+      box-shadow: 0 0 0 4px #22c55e, 0 0 40px 10px rgba(34, 197, 94, 0.7);
+    }
+
+    #reader-preview {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+
+    #reader-preview video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+      border-radius: 16px;
+    }
+
+    /* ガイド枠（中央ターゲット） */
+    .scan-guide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 75%;
+      max-width: 300px;
+      height: 45%;
+      max-height: 180px;
+      border: 2px dashed rgba(255, 255, 255, 0.65);
+      border-radius: 12px;
+      pointer-events: none;
+      z-index: 5;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+    }
+
+    /* レーザー走査線 */
+    .scan-laser {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #0284c7, #38bdf8, transparent);
+      box-shadow: 0 0 10px 2px rgba(56, 189, 248, 0.7);
+      animation: scanLaser 2s infinite ease-in-out;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    @keyframes scanLaser {
+      0% { top: 15%; opacity: 0.2; }
+      50% { top: 85%; opacity: 1; }
+      100% { top: 15%; opacity: 0.2; }
+    }
+
+    /* スキャン成功オーバーレイ */
+    .success-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(34, 197, 94, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 10;
+      backdrop-filter: blur(2px);
+    }
+
+    .success-overlay.visible {
+      opacity: 1;
+    }
+
+    .success-icon {
+      font-size: 4rem;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+    }
+
+    .success-code {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 8px;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+    }
+
+    /* 下部ステータス & コントロール */
+    .control-panel {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    #status-area {
+      width: 100%;
+      min-height: 54px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-align: center;
+      background: #1e293b;
+      border: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    #status-area.ready   { color: #cbd5e1; }
+    #status-area.success { color: #22c55e; background: #052e16; border-color: #22c55e; }
+    #status-area.error   { color: #ef4444; background: #450a0a; border-color: #ef4444; }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      height: 46px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+      background: #334155;
+    }
+
+    .btn-close {
+      background: #334155;
+      color: #f8fafc;
+    }
+
+    /* 独立単体実行時の結果表示カード（openerがない場合） */
+    #manual-result-card {
+      display: none;
+      margin-top: 8px;
+      padding: 12px;
+      background: #1e293b;
+      border: 1px solid #38bdf8;
+      border-radius: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-group">
+      <span>📷</span>
+      <h1>バーコードスキャナー</h1>
+    </div>
+    <div id="target-badge" class="badge-target">スキャン準備完了</div>
+  </header>
+
+  <!-- カメラプレビュー -->
+  <div class="scanner-wrapper">
+    <div id="scanner-box" class="scanner-container">
+      <div id="reader-preview"></div>
+      <div class="scan-guide">
+        <div class="scan-laser"></div>
+      </div>
+      <div id="success-overlay" class="success-overlay">
+        <span class="success-icon">✅</span>
+        <div id="success-code-display" class="success-code"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作部 -->
+  <div class="control-panel">
+    <div id="status-area" class="ready">バーコードを枠内に合わせてください</div>
+    
+    <div id="manual-result-card">
+      <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;">読み取り結果:</div>
+      <div id="manual-code" style="font-size: 1.2rem; font-weight: 700; color: #38bdf8;">-</div>
+      <button id="btn-copy" class="btn" style="margin-top: 8px; height: 36px; font-size: 0.8rem;">📋 クリップボードにコピー</button>
+    </div>
+
+    <div class="btn-group">
+      <button id="btn-switch-cam" class="btn">🔄 カメラ切替</button>
+      <button id="btn-cancel" class="btn btn-close">✖ 閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    // URLパラメータの取得
+    const params = new URLSearchParams(window.location.search);
+    const targetInputId = params.get('target') || '';
+    const scanMode = params.get('mode') || 'single'; // 'single' | 'continuous'
+    const targetLabel = params.get('label') || 'バーコード';
+
+    // バッジの表示更新
+    const badgeEl = document.getElementById('target-badge');
+    if (targetLabel) {
+      badgeEl.textContent = `読取対象: ${targetLabel}`;
+    }
+
+    // Web Audio API によるスキャン成功音
+    let audioCtx = null;
+    function playBeep() {
+      try {
+        if (!audioCtx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1760, audioCtx.currentTime); // A6 (高音ピピッ)
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch (e) {
+        console.warn('Audio play error:', e);
+      }
+    }
+
+    let html5QrCode = null;
+    let isScanning = false;
+    let isCooldown = false;
+    let currentFacingMode = "environment"; // 背面優先
+
+    const statusArea = document.getElementById('status-area');
+    const scannerBox = document.getElementById('scanner-box');
+    const successOverlay = document.getElementById('success-overlay');
+    const successCodeDisplay = document.getElementById('success-code-display');
+
+    function setStatus(type, msg) {
+      statusArea.className = type;
+      statusArea.textContent = msg;
+    }
+
+    async function startCamera(facing = "environment") {
+      if (typeof Html5Qrcode === 'undefined') {
+        setStatus('error', 'カメラライブラリの読込に失敗しました');
+        return;
+      }
+
+      if (html5QrCode) {
+        try {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        } catch (e) {}
+      }
+
+      html5QrCode = new Html5Qrcode("reader-preview");
+
+      const config = {
+        fps: 12,
+        qrbox: { width: 280, height: 150 },
+        aspectRatio: 1.333333
+      };
+
+      try {
+        await html5QrCode.start(
+          { facingMode: facing },
+          config,
+          onCodeScanned,
+          (err) => { /* フレームスキップ */ }
+        );
+        isScanning = true;
+        isCooldown = false;
+        setStatus('ready', `${targetLabel}を中央の枠に合わせてください`);
+      } catch (err) {
+        console.error("Camera start error:", err);
+        setStatus('error', 'カメラの起動に失敗しました。アクセス許可を確認してください。');
+      }
+    }
+
+    /**
+     * スキャン成功時ハンドラ
+     */
+    function onCodeScanned(decodedText) {
+      if (!isScanning || isCooldown) return;
+      const code = decodedText.trim();
+      if (!code) return;
+
+      isScanning = false;
+      isCooldown = true;
+
+      // ① 演出
+      playBeep();
+      scannerBox.classList.add('success-flash');
+      successCodeDisplay.textContent = code;
+      successOverlay.classList.add('visible');
+      setStatus('success', `読取成功: ${code}`);
+
+      // ② 親ウィンドウ（GAS本体）へ postMessage で送信
+      let messageSent = false;
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage({
+            type: 'LIBRARY_SCAN_RESULT',
+            code: code,
+            target: targetInputId
+          }, '*');
+          messageSent = true;
+          console.log('[Scanner] Sent code to opener:', code);
+        } catch (e) {
+          console.warn('[Scanner] Failed to postMessage:', e);
+        }
+      }
+
+      // 単独実行時のフォールバック表示
+      if (!messageSent) {
+        document.getElementById('manual-result-card').style.display = 'block';
+        document.getElementById('manual-code').textContent = code;
+        document.getElementById('btn-copy').onclick = () => {
+          navigator.clipboard.writeText(code).then(() => {
+            alert('クリップボードにコピーしました: ' + code);
+          });
+        };
+      }
+
+      // ③ モードに応じた終了処理
+      if (scanMode === 'single' && messageSent) {
+        // 単発モード: 500ms後に自動でウィンドウを閉じる
+        setTimeout(() => {
+          window.close();
+        }, 550);
+      } else {
+        // 連続モードまたは単独起動: 1.8秒後に待機復帰
+        setTimeout(() => {
+          scannerBox.classList.remove('success-flash');
+          successOverlay.classList.remove('visible');
+          isCooldown = false;
+          isScanning = true;
+          setStatus('ready', `${targetLabel}を枠に合わせてください`);
+        }, 1800);
+      }
+    }
+
+    // カメラ切替ボタン
+    document.getElementById('btn-switch-cam').addEventListener('click', async () => {
+      currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+      await startCamera(currentFacingMode);
+    });
+
+    // 閉じるボタン
+    document.getElementById('btn-cancel').addEventListener('click', () => {
+      window.close();
+    });
+
+    // 起動
+    window.addEventListener('DOMContentLoaded', () => {
+      startCamera(currentFacingMode);
+    });
+  </script>
+</body>
+</html>
