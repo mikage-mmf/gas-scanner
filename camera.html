@@ -171,6 +171,7 @@
 
     .success-overlay.visible {
       opacity: 1;
+      pointer-events: auto;
     }
 
     .success-icon {
@@ -184,6 +185,15 @@
       color: #fff;
       margin-top: 6px;
       text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+    }
+
+    .btn-return-host {
+      background: #38bdf8 !important;
+      color: #0f172a !important;
+      font-weight: 700 !important;
+      font-size: 0.95rem !important;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4) !important;
+      border: none !important;
     }
 
     /* 下部ステータス & コントロール */
@@ -312,6 +322,9 @@
       <div id="success-overlay" class="success-overlay">
         <span class="success-icon">✅</span>
         <div id="success-code-display" class="success-code"></div>
+        <button id="btn-return-host" class="btn btn-return-host" type="button" style="margin-top: 14px; width: 85%; max-width: 260px; height: 44px; display: none;">
+          ↩️ タブを閉じて戻る
+        </button>
       </div>
     </div>
   </div>
@@ -475,7 +488,9 @@
 
       // モードに応じた挙動
       if (scanMode === 'single' && messageSent) {
-        // 単発モード: 即終了
+        // 単発モード: 即終了を試みつつ、スマホで自動クローズがブロックされた場合に備えて復帰ボタンを表示
+        const btnReturn = document.getElementById('btn-return-host');
+        if (btnReturn) btnReturn.style.display = 'flex';
         setTimeout(() => window.close(), 550);
       } else if (scanMode === 'checkout-flow' && messageSent) {
         // 連続貸出フローモード: 親からの状態通知（UPDATE_SCANNER_STEP）を待つ
@@ -565,6 +580,11 @@
     document.getElementById('btn-switch-cam').addEventListener('click', async () => {
       currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
       await startCamera(currentFacingMode);
+    });
+
+    // 復帰ボタン（スマホでタブが自動で閉じなかった時の手動復帰）
+    document.getElementById('btn-return-host')?.addEventListener('click', () => {
+      window.close();
     });
 
     // 閉じる（やめる・キャンセル）
