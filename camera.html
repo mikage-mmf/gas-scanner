@@ -62,8 +62,15 @@
       border: 1px solid #0284c7;
       font-size: 0.75rem;
       font-weight: 600;
-      padding: 2px 8px;
+      padding: 2px 10px;
       border-radius: 9999px;
+      transition: all 0.2s;
+    }
+
+    .badge-target.step-book {
+      color: #4ade80;
+      border-color: #16a34a;
+      background: #064e3b;
     }
 
     /* カメラ枠ラッパー */
@@ -167,7 +174,7 @@
     }
 
     .success-icon {
-      font-size: 4rem;
+      font-size: 3.8rem;
       filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
     }
 
@@ -175,7 +182,7 @@
       font-size: 1.25rem;
       font-weight: 700;
       color: #fff;
-      margin-top: 8px;
+      margin-top: 6px;
       text-shadow: 0 2px 6px rgba(0,0,0,0.7);
     }
 
@@ -191,7 +198,7 @@
 
     #status-area {
       width: 100%;
-      min-height: 54px;
+      min-height: 52px;
       padding: 10px 16px;
       border-radius: 12px;
       font-size: 0.95rem;
@@ -203,11 +210,43 @@
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
+      line-height: 1.4;
     }
 
     #status-area.ready   { color: #cbd5e1; }
+    #status-area.step    { color: #38bdf8; background: #082f49; border-color: #0284c7; }
     #status-area.success { color: #22c55e; background: #052e16; border-color: #22c55e; }
     #status-area.error   { color: #ef4444; background: #450a0a; border-color: #ef4444; }
+
+    /* 1冊終了ボタン（目立つアクション） */
+    #btn-finish-checkout {
+      width: 100%;
+      height: 50px;
+      border-radius: 12px;
+      border: 1px solid #34d399;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: none; /* 初期は非表示 */
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+      transition: all 0.15s;
+      animation: pulseButton 2.2s infinite ease-in-out;
+    }
+
+    #btn-finish-checkout:active {
+      transform: scale(0.98);
+      background: #047857;
+    }
+
+    @keyframes pulseButton {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
 
     .btn-group {
       display: flex;
@@ -216,7 +255,7 @@
 
     .btn {
       flex: 1;
-      height: 46px;
+      height: 44px;
       border-radius: 10px;
       border: 1px solid #334155;
       background: #1e293b;
@@ -241,11 +280,11 @@
       color: #f8fafc;
     }
 
-    /* 独立単体実行時の結果表示カード（openerがない場合） */
+    /* 単体実行時の結果表示カード */
     #manual-result-card {
       display: none;
-      margin-top: 8px;
-      padding: 12px;
+      margin-top: 6px;
+      padding: 10px;
       background: #1e293b;
       border: 1px solid #38bdf8;
       border-radius: 10px;
@@ -260,7 +299,7 @@
       <span>📷</span>
       <h1>バーコードスキャナー</h1>
     </div>
-    <div id="target-badge" class="badge-target">スキャン準備完了</div>
+    <div id="target-badge" class="badge-target">スキャン準備中</div>
   </header>
 
   <!-- カメラプレビュー -->
@@ -279,12 +318,17 @@
 
   <!-- 操作部 -->
   <div class="control-panel">
-    <div id="status-area" class="ready">バーコードを枠内に合わせてください</div>
+    <div id="status-area" class="ready">カメラを起動しています...</div>
     
+    <!-- 1冊で終了ボタン（セッション連動スキャン時に出現） -->
+    <button id="btn-finish-checkout" type="button">
+      <span>🟢</span> この1冊で貸出を終了する
+    </button>
+
     <div id="manual-result-card">
-      <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;">読み取り結果:</div>
-      <div id="manual-code" style="font-size: 1.2rem; font-weight: 700; color: #38bdf8;">-</div>
-      <button id="btn-copy" class="btn" style="margin-top: 8px; height: 36px; font-size: 0.8rem;">📋 クリップボードにコピー</button>
+      <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 2px;">読み取り結果:</div>
+      <div id="manual-code" style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">-</div>
+      <button id="btn-copy" class="btn" style="margin-top: 6px; height: 34px; font-size: 0.8rem;">📋 クリップボードにコピー</button>
     </div>
 
     <div class="btn-group">
@@ -296,50 +340,55 @@
   <script>
     // URLパラメータの取得
     const params = new URLSearchParams(window.location.search);
-    const targetInputId = params.get('target') || '';
-    const scanMode = params.get('mode') || 'single'; // 'single' | 'continuous'
-    const targetLabel = params.get('label') || 'バーコード';
+    let currentTargetInputId = params.get('target') || '';
+    const scanMode = params.get('mode') || 'single'; // 'single' | 'continuous' | 'checkout-flow'
+    let currentTargetLabel = params.get('label') || 'バーコード';
 
-    // バッジの表示更新
+    // バッジ & UI
     const badgeEl = document.getElementById('target-badge');
-    if (targetLabel) {
-      badgeEl.textContent = `読取対象: ${targetLabel}`;
-    }
+    const statusArea = document.getElementById('status-area');
+    const scannerBox = document.getElementById('scanner-box');
+    const successOverlay = document.getElementById('success-overlay');
+    const successCodeDisplay = document.getElementById('success-code-display');
+    const btnFinishCheckout = document.getElementById('btn-finish-checkout');
 
-    // Web Audio API によるスキャン成功音
+    function updateBadge(label, isStepBook = false) {
+      badgeEl.textContent = label;
+      if (isStepBook) {
+        badgeEl.classList.add('step-book');
+      } else {
+        badgeEl.classList.remove('step-book');
+      }
+    }
+    updateBadge(currentTargetLabel);
+
+    // 効果音 (Web Audio API)
     let audioCtx = null;
-    function playBeep() {
+    function playBeep(freq = 1760, duration = 0.12) {
       try {
         if (!audioCtx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          audioCtx = new AudioContext();
+          const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioCtxClass();
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1760, audioCtx.currentTime); // A6 (高音ピピッ)
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.12);
-      } catch (e) {
-        console.warn('Audio play error:', e);
-      }
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
     }
 
     let html5QrCode = null;
     let isScanning = false;
     let isCooldown = false;
-    let currentFacingMode = "environment"; // 背面優先
-
-    const statusArea = document.getElementById('status-area');
-    const scannerBox = document.getElementById('scanner-box');
-    const successOverlay = document.getElementById('success-overlay');
-    const successCodeDisplay = document.getElementById('success-code-display');
+    let currentFacingMode = "environment";
 
     function setStatus(type, msg) {
       statusArea.className = type;
@@ -360,7 +409,6 @@
       }
 
       html5QrCode = new Html5Qrcode("reader-preview");
-
       const config = {
         fps: 12,
         qrbox: { width: 280, height: 150 },
@@ -372,19 +420,19 @@
           { facingMode: facing },
           config,
           onCodeScanned,
-          (err) => { /* フレームスキップ */ }
+          () => {}
         );
         isScanning = true;
         isCooldown = false;
-        setStatus('ready', `${targetLabel}を中央の枠に合わせてください`);
+        setStatus('ready', `${currentTargetLabel}を枠に合わせてください`);
       } catch (err) {
         console.error("Camera start error:", err);
-        setStatus('error', 'カメラの起動に失敗しました。アクセス許可を確認してください。');
+        setStatus('error', 'カメラの起動に失敗しました。カメラ権限を確認してください。');
       }
     }
 
     /**
-     * スキャン成功時ハンドラ
+     * スキャン認識時ハンドラ
      */
     function onCodeScanned(decodedText) {
       if (!isScanning || isCooldown) return;
@@ -394,65 +442,132 @@
       isScanning = false;
       isCooldown = true;
 
-      // ① 演出
       playBeep();
       scannerBox.classList.add('success-flash');
       successCodeDisplay.textContent = code;
       successOverlay.classList.add('visible');
       setStatus('success', `読取成功: ${code}`);
 
-      // ② 親ウィンドウ（GAS本体）へ postMessage で送信
+      // 親ウィンドウ（GAS本体）へ送信
       let messageSent = false;
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage({
             type: 'LIBRARY_SCAN_RESULT',
             code: code,
-            target: targetInputId
+            target: currentTargetInputId
           }, '*');
           messageSent = true;
-          console.log('[Scanner] Sent code to opener:', code);
+          console.log('[Scanner] Sent to opener:', code, currentTargetInputId);
         } catch (e) {
-          console.warn('[Scanner] Failed to postMessage:', e);
+          console.warn('[Scanner] postMessage error:', e);
         }
       }
 
-      // 単独実行時のフォールバック表示
+      // opener不在の単体利用フォールバック
       if (!messageSent) {
         document.getElementById('manual-result-card').style.display = 'block';
         document.getElementById('manual-code').textContent = code;
         document.getElementById('btn-copy').onclick = () => {
-          navigator.clipboard.writeText(code).then(() => {
-            alert('クリップボードにコピーしました: ' + code);
-          });
+          navigator.clipboard.writeText(code).then(() => alert('コピーしました: ' + code));
         };
       }
 
-      // ③ モードに応じた終了処理
+      // モードに応じた挙動
       if (scanMode === 'single' && messageSent) {
-        // 単発モード: 500ms後に自動でウィンドウを閉じる
+        // 単発モード: 即終了
+        setTimeout(() => window.close(), 550);
+      } else if (scanMode === 'checkout-flow' && messageSent) {
+        // 連続貸出フローモード: 親からの状態通知（UPDATE_SCANNER_STEP）を待つ
         setTimeout(() => {
-          window.close();
-        }, 550);
+          scannerBox.classList.remove('success-flash');
+          successOverlay.classList.remove('visible');
+          // クールダウン解除し、次の読み取りに備える
+          isCooldown = false;
+          isScanning = true;
+        }, 1200);
       } else {
-        // 連続モードまたは単独起動: 1.8秒後に待機復帰
+        // 返却等の連続スキャンモード: 1.8秒後に待機復帰
         setTimeout(() => {
           scannerBox.classList.remove('success-flash');
           successOverlay.classList.remove('visible');
           isCooldown = false;
           isScanning = true;
-          setStatus('ready', `${targetLabel}を枠に合わせてください`);
+          setStatus('ready', `${currentTargetLabel}を枠に合わせてください`);
         }, 1800);
       }
     }
 
-    // カメラ切替ボタン
+    /**
+     * 親ウィンドウ（GAS本体）からの状態更新を受信
+     * 個人情報（名前など）は含まれず、ステータス記号と残り冊数のみ
+     */
+    window.addEventListener('message', (event) => {
+      if (!event.data) return;
+      const data = event.data;
+
+      if (data.type === 'UPDATE_SCANNER_STEP') {
+        const step = data.step; // 'BOOK_CHECKOUT' | 'COMPLETE'
+        const remaining = data.remaining; // 0, 1, 2
+        const target = data.target || 'input-book-id';
+
+        currentTargetInputId = target;
+
+        if (step === 'BOOK_CHECKOUT') {
+          // 本スキャン待機状態へ更新
+          updateBadge(`本のシール (あと${remaining}冊)`, true);
+          
+          if (remaining > 1) {
+            // まだ2冊借りられる場合
+            setStatus('step', `✅ 利用者確認済（あと${remaining}冊）：本のシールをかざしてください`);
+            btnFinishCheckout.style.display = 'none';
+          } else if (remaining === 1) {
+            // 残り1冊（1冊読んだ後、または元々残り1冊だった場合）
+            setStatus('step', `✅ 1冊目を登録しました（あと1冊可能）：2冊目をかざすか、下のボタンで終了できます`);
+            btnFinishCheckout.style.display = 'flex'; // 1冊終了ボタンを表示！
+          }
+        } else if (step === 'COMPLETE') {
+          // 上限達成等で貸出完了
+          playBeep(2200, 0.2);
+          btnFinishCheckout.style.display = 'none';
+          setStatus('success', '✅ 貸出を完了しました！');
+          setTimeout(() => {
+            window.close();
+          }, 800);
+        }
+      } else if (data.type === 'SCANNER_ERROR') {
+        // 貸出不可・エラー時
+        setStatus('error', data.message || 'エラーが発生しました');
+        btnFinishCheckout.style.display = 'none';
+      }
+    });
+
+    // 「この1冊で貸出を終了する」ボタン
+    btnFinishCheckout.addEventListener('click', () => {
+      playBeep(1960, 0.15);
+      setStatus('success', '✅ 1冊で貸出を完了します...');
+      btnFinishCheckout.disabled = true;
+
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage({
+            type: 'FINISH_CHECKOUT_SESSION'
+          }, '*');
+        } catch (e) {}
+      }
+
+      setTimeout(() => {
+        window.close();
+      }, 500);
+    });
+
+    // カメラ切替
     document.getElementById('btn-switch-cam').addEventListener('click', async () => {
       currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
       await startCamera(currentFacingMode);
     });
 
-    // 閉じるボタン
+    // 閉じる
     document.getElementById('btn-cancel').addEventListener('click', () => {
       window.close();
     });
