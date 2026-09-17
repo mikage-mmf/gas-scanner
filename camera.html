@@ -571,12 +571,11 @@
     document.getElementById('btn-cancel').addEventListener('click', () => {
       if (window.opener && !window.opener.closed) {
         try {
-          // 貸出連続フロー中（checkout-flow）の場合のみ、親画面の貸出セッションを安全にリセット
-          if (scanMode === 'checkout-flow') {
-            window.opener.postMessage({
-              type: 'CANCEL_CHECKOUT_SESSION'
-            }, '*');
-          }
+          window.opener.postMessage({
+            type: 'CANCEL_SCANNER',
+            mode: scanMode,
+            target: currentTargetInputId
+          }, '*');
         } catch (e) {}
       }
       window.close();
