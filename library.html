@@ -662,6 +662,129 @@
     0%, 100% { background-color: var(--bg-main); }
     25%, 75% { background-color: #fee2e2; }
   }
+
+  /* ==========================================
+   * GAS環境専用 誘導バナー & カメラフォールバックUI
+   * ========================================== */
+  .gas-notice-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(79, 70, 229, 0.16));
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: var(--radius-sm);
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    color: #1e3a8a;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  }
+
+  .gas-notice-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .gas-notice-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .gas-notice-text {
+    line-height: 1.5;
+  }
+
+  .gas-notice-text a {
+    color: #2563eb;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .gas-notice-text a:hover {
+    color: #1d4ed8;
+  }
+
+  .gas-notice-close {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0 6px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .gas-notice-close:hover {
+    color: #0f172a;
+  }
+
+  /* カメラプレビュー枠内のフォールバック誘導カード */
+  .camera-fallback-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 250px;
+    padding: 24px 20px;
+    text-align: center;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 12px;
+    box-sizing: border-box;
+    color: #f8fafc;
+  }
+
+  .camera-fallback-icon {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  }
+
+  .camera-fallback-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+
+  .camera-fallback-desc {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.5;
+    max-width: 340px;
+    margin: 0 0 18px 0;
+  }
+
+  .btn-camera-launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff !important;
+    font-size: 0.92rem;
+    font-weight: 700;
+    padding: 11px 22px;
+    border-radius: 8px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .btn-camera-launch:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
+  }
+
+  .camera-fallback-hint {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 14px;
+    line-height: 1.4;
+  }
 </style>
 
 </head>
@@ -687,6 +810,18 @@
         </button>
       </div>
     </header>
+
+    <!-- GAS環境用 カメラ誘導バナー (iframe環境でのみ自動表示) -->
+    <div id="gas-notice-banner" class="gas-notice-banner" style="display: none;">
+      <div class="gas-notice-content">
+        <span class="gas-notice-icon">📷</span>
+        <div class="gas-notice-text">
+          <strong>内蔵カメラでのバーコード読取をご利用ですか？</strong><br>
+          Googleのセキュリティ制約（iframe）により、この画面内では直接カメラが起動できません。カメラを使用する場合は、制限のない <strong><a id="link-gas-notice-github" href="https://mikage-mmf.github.io/gas-scanner/library.html" target="_blank">【カメラ対応Webアプリ版（GitHub Pages）】↗</a></strong> をご利用ください。（※外付けバーコードリーダーは現在の画面のままでもご利用可能です）
+        </div>
+      </div>
+      <button id="btn-close-gas-banner" class="gas-notice-close" title="案内を閉じる">×</button>
+    </div>
 
     <!-- ナビゲーションタブ -->
     <nav class="nav-tabs">
@@ -991,6 +1126,67 @@
      * 通信中は全画面ローディングで画面操作およびスキャナーを完全ロックする
      */
     const DEFAULT_GAS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxp8anSN54rmJ89Qj1BK1WqNcs1h80XPPCM4dQIgYh_1FaYsGBdgEBVENoXskf8EWxF/exec';
+    const GITHUB_PAGES_URL = 'https://mikage-mmf.github.io/gas-scanner/library.html';
+
+    /**
+     * GAS iframe環境（カメラ物理制約環境）かどうかの判定
+     */
+    function isGasEnvironment() {
+      try {
+        return window.self !== window.top || 
+               location.hostname.includes('googleusercontent.com') || 
+               location.hostname.includes('script.google.com');
+      } catch (e) {
+        return true; // セキュリティ制約でwindow.topへのアクセスが拒否された場合はiframe内確定
+      }
+    }
+
+    /**
+     * カメラ枠内にプロフェッショナルなフォールバックUI（GitHub Pages誘導）を描画
+     */
+    function renderCameraFallbackUI(elementId, reason = 'Googleセキュリティ制限によりカメラがブロックされました') {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+
+      const isGas = isGasEnvironment();
+      const title = isGas ? 'カメラ対応Webアプリ版のご案内' : 'カメラを起動できませんでした';
+      const desc = isGas 
+        ? 'Googleのセキュリティ制約（iframe環境）により、この画面内では直接カメラを起動できません。iPadやPCの内蔵カメラでバーコードをスキャンする場合は、制限のないカメラ対応Webアプリ版をご利用ください。'
+        : `${reason}。カメラのアクセス権限を確認するか、カメラ対応版またはバーコードリーダーをご利用ください。`;
+
+      el.innerHTML = `
+        <div class="camera-fallback-card">
+          <div class="camera-fallback-icon">📷</div>
+          <div class="camera-fallback-title">${escapeHtml(title)}</div>
+          <p class="camera-fallback-desc">${escapeHtml(desc)}</p>
+          <a href="${GITHUB_PAGES_URL}" target="_blank" class="btn-camera-launch">
+            <span>🚀</span> カメラ対応版を開く (GitHub Pages) ↗
+          </a>
+          <div class="camera-fallback-hint">
+            💡 <strong>外付けバーコードリーダー</strong>または<strong>キーボード入力</strong>は、現在の画面のままでもそのまま高速にご利用いただけます。
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * GAS環境専用 カメラ案内バナーの初期化
+     */
+    function setupGasNoticeBanner() {
+      const banner = document.getElementById('gas-notice-banner');
+      const closeBtn = document.getElementById('btn-close-gas-banner');
+      if (!banner) return;
+
+      // GAS環境であり、かつセッション内でまだ非表示にされていない場合のみ表示
+      if (isGasEnvironment() && sessionStorage.getItem('gas_banner_dismissed') !== 'true') {
+        banner.style.display = 'flex';
+      }
+
+      closeBtn?.addEventListener('click', () => {
+        banner.style.display = 'none';
+        sessionStorage.setItem('gas_banner_dismissed', 'true');
+      });
+    }
 
     function apiCall(funcName, ...args) {
       return new Promise((resolve, reject) => {
@@ -1413,6 +1609,7 @@
     window.addEventListener('DOMContentLoaded', async () => {
       setupTabNavigation();
       setupAdminPinModal();
+      setupGasNoticeBanner();
 
       // 各機能モジュールの安全初期化（存在チェック付き）
       if (typeof initCheckoutModule === 'function') {
@@ -1429,8 +1626,22 @@
       });
 
       // カメラ再起動ボタン
-      document.getElementById('btn-switch-camera-checkout')?.addEventListener('click', startCheckoutScanner);
-      document.getElementById('btn-switch-camera-return')?.addEventListener('click', startReturnScanner);
+      document.getElementById('btn-switch-camera-checkout')?.addEventListener('click', () => {
+        if (isGasEnvironment()) {
+          showToast("GAS画面内ではカメラが制限されています。上部またはカメラ枠内の【カメラ対応版】をご利用ください。", "info");
+          renderCameraFallbackUI('reader-checkout');
+        } else {
+          startCheckoutScanner();
+        }
+      });
+      document.getElementById('btn-switch-camera-return')?.addEventListener('click', () => {
+        if (isGasEnvironment()) {
+          showToast("GAS画面内ではカメラが制限されています。上部またはカメラ枠内の【カメラ対応版】をご利用ください。", "info");
+          renderCameraFallbackUI('reader-return');
+        } else {
+          startReturnScanner();
+        }
+      });
 
       // 初期設定取得
       try {
@@ -1484,10 +1695,19 @@
     const el = document.getElementById(elementId);
     if (!el) return;
 
+    // GAS iframe環境の場合は直接カメラを起動せずプロフェッショナルな誘導カードを描画
+    if (typeof isGasEnvironment === 'function' && isGasEnvironment()) {
+      renderCameraFallbackUI(elementId);
+      updateRegisterScanStatus('カメラ制限環境です（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
+      return;
+    }
+
     if (typeof Html5Qrcode === 'undefined') {
-      console.warn("Html5Qrcode ライブラリが未定義です（カメラ制限環境）");
-      updateRegisterScanStatus('カメラは利用できません（バーコードリーダーまたはキーボード入力をご利用ください）');
-      el.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.9rem; padding:16px; text-align:center;"><span>📷 カメラ制限環境</span><span style="font-size:0.75rem; margin-top:4px;">バーコードリーダーでの入力をお勧めします</span></div>';
+      console.warn("Html5Qrcode ライブラリが未定義です");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラライブラリが読み込めませんでした");
+      }
+      updateRegisterScanStatus('バーコードリーダーまたはキーボード入力をご利用ください');
       return;
     }
 
@@ -1516,8 +1736,10 @@
       );
     } catch (err) {
       console.warn("カメラ起動エラー:", err);
-      updateRegisterScanStatus('カメラを起動できませんでした（手入力をご利用ください）');
-      showToast("カメラを起動できませんでした。手入力をご利用ください。", "warning");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラへのアクセスが拒否されたか、利用できません");
+      }
+      updateRegisterScanStatus('カメラを利用できません（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
     }
   }
 
@@ -1848,10 +2070,19 @@
     const el = document.getElementById(elementId);
     if (!el) return;
 
+    // GAS iframe環境の場合は直接カメラを起動せずプロフェッショナルな誘導カードを描画
+    if (typeof isGasEnvironment === 'function' && isGasEnvironment()) {
+      renderCameraFallbackUI(elementId);
+      updateCheckoutScanStatus('カメラ制限環境です（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
+      return;
+    }
+
     if (typeof Html5Qrcode === 'undefined') {
-      console.warn("Html5Qrcode ライブラリが未定義です（カメラ制限環境）");
-      updateCheckoutScanStatus('カメラは利用できません（バーコードリーダーまたはキーボード入力をご利用ください）');
-      el.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.9rem; padding:16px; text-align:center;"><span>📷 カメラ制限環境</span><span style="font-size:0.75rem; margin-top:4px;">バーコードリーダーでの入力をお勧めします</span></div>';
+      console.warn("Html5Qrcode ライブラリが未定義です");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラライブラリが読み込めませんでした");
+      }
+      updateCheckoutScanStatus('バーコードリーダーまたはキーボード入力をご利用ください');
       return;
     }
 
@@ -1877,8 +2108,10 @@
       );
     } catch (err) {
       console.warn("貸出カメラ起動エラー:", err);
-      updateCheckoutScanStatus('カメラを起動できませんでした（バーコードリーダーまたは手入力をご利用ください）');
-      showToast("カメラを起動できませんでした。手入力をご利用ください。", "warning");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラへのアクセスが拒否されたか、利用できません");
+      }
+      updateCheckoutScanStatus('カメラを利用できません（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
     }
   }
 
@@ -2120,10 +2353,19 @@
     const el = document.getElementById(elementId);
     if (!el) return;
 
+    // GAS iframe環境の場合は直接カメラを起動せずプロフェッショナルな誘導カードを描画
+    if (typeof isGasEnvironment === 'function' && isGasEnvironment()) {
+      renderCameraFallbackUI(elementId);
+      updateReturnScanStatus('カメラ制限環境です（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
+      return;
+    }
+
     if (typeof Html5Qrcode === 'undefined') {
-      console.warn("Html5Qrcode ライブラリが未定義です（カメラ制限環境）");
-      updateReturnScanStatus('カメラは利用できません（バーコードリーダーまたはキーボード入力をご利用ください）');
-      el.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.9rem; padding:16px; text-align:center;"><span>📷 カメラ制限環境</span><span style="font-size:0.75rem; margin-top:4px;">バーコードリーダーでの入力をお勧めします</span></div>';
+      console.warn("Html5Qrcode ライブラリが未定義です");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラライブラリが読み込めませんでした");
+      }
+      updateReturnScanStatus('バーコードリーダーまたはキーボード入力をご利用ください');
       return;
     }
 
@@ -2149,8 +2391,10 @@
       );
     } catch (err) {
       console.warn("返却カメラ起動エラー:", err);
-      updateReturnScanStatus('カメラを起動できませんでした（バーコードリーダーまたは手入力をご利用ください）');
-      showToast("カメラを起動できませんでした。手入力をご利用ください。", "warning");
+      if (typeof renderCameraFallbackUI === 'function') {
+        renderCameraFallbackUI(elementId, "カメラへのアクセスが拒否されたか、利用できません");
+      }
+      updateReturnScanStatus('カメラを利用できません（バーコードリーダーまたは【カメラ対応版】をご利用ください）');
     }
   }
 
