@@ -567,8 +567,15 @@
       await startCamera(currentFacingMode);
     });
 
-    // 閉じる
+    // 閉じる（やめる・キャンセル）
     document.getElementById('btn-cancel').addEventListener('click', () => {
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage({
+            type: 'CANCEL_CHECKOUT_SESSION'
+          }, '*');
+        } catch (e) {}
+      }
       window.close();
     });
 
