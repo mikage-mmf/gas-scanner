@@ -995,10 +995,7 @@
       <button type="button" class="shelf-btn-tool" id="btn-shelf-settings" title="設定">
         ⚙️ <span>設定</span>
       </button>
-      <a id="btn-shelf-nav-kiosk" href="?mode=kiosk" class="shelf-btn-tool" style="text-decoration: none;" title="キオスク画面へ" target="_top">
-        🖥️
-      </a>
-      <a id="btn-shelf-nav-main" href="./" class="shelf-btn-tool" style="text-decoration: none;" title="図書管理システムへ" target="_top">
+      <a id="btn-shelf-nav-main" href="./" class="shelf-btn-tool" style="text-decoration: none;" title="図書システム（キオスク）へ戻る" target="_top">
         🏠 戻る
       </a>
     </div>
@@ -1491,12 +1488,11 @@
     function initHeaderNavLinks() {
       const isLocalFile = window.location && window.location.protocol === 'file:';
       const canonicalGasUrl = 'https://script.google.com/macros/s/AKfycbyIaNK50vKYhZplhUU__0bxp9JP1be9mZOXSZyvk00/exec';
-      const mainUrl = isLocalFile ? 'library.html' : canonicalGasUrl;
-      const kioskUrl = isLocalFile ? 'library.html?mode=kiosk' : (canonicalGasUrl + '?mode=kiosk');
+      const returnUrl = isLocalFile ? 'library.html' : canonicalGasUrl;
 
       const navMain = document.getElementById('btn-shelf-nav-main');
       if (navMain) {
-        navMain.href = mainUrl;
+        navMain.href = returnUrl;
         navMain.addEventListener('click', (e) => {
           if (window.opener && !window.opener.closed) {
             e.preventDefault();
@@ -1505,18 +1501,7 @@
           }
           if (window.top && window.top !== window) {
             e.preventDefault();
-            window.top.location.href = mainUrl;
-          }
-        });
-      }
-
-      const navKiosk = document.getElementById('btn-shelf-nav-kiosk');
-      if (navKiosk) {
-        navKiosk.href = kioskUrl;
-        navKiosk.addEventListener('click', (e) => {
-          if (window.top && window.top !== window) {
-            e.preventDefault();
-            window.top.location.href = kioskUrl;
+            window.top.location.href = returnUrl;
           }
         });
       }
