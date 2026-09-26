@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
-
-  <!-- html5-qrcode (フォールバック付き) -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';"></script>
+  
+  <!-- html5-qrcode CDN (フォールバック削除) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -444,18 +444,70 @@
       }
     }
 
+    function cleanBookBarcode(raw) {
+      if (!raw) return '';
+      let c = String(raw).trim();
+      // 1. CODE39のアスタリスク (*) を除去
+      c = c.replace(/^\*+|\*+$/g, '');
+      // 2. NW-7のスタート/ストップ文字 (A〜D / a〜d) を除去（中身が数字の場合のみ）
+      const nw7Match = c.match(/^[A-Da-d](\d{4,12})[A-Da-d]$/);
+      if (nw7Match) {
+        c = nw7Match[1];
+      }
+      // 3. 空白除去
+      c = c.replace(/\s+/g, '');
+      return c;
+    }
+
     /**
      * スキャン認識時ハンドラ
      */
     function onCodeScanned(decodedText) {
       if (!isScanning || isCooldown) return;
-      const code = decodedText.trim();
-      if (!code) return;
+      const rawCode = decodedText.trim();
+      if (!rawCode) return;
+
+      let code = rawCode.replace(/[-\s]/g, '').toUpperCase();
+
+      // 本の固有ID系ターゲットならバーコード正規化を実施（NW-7/CODE39の枠文字除去）
+      if (currentTargetInputId === 'input-book-id' || currentTargetInputId === 'input-return-book-id' || currentTargetInputId === 'reg-book-id') {
+        code = cleanBookBarcode(rawCode);
+      }
+
+      // 【ISBNスキャン時の上下2段バーコード誤読防止ガード】
+      if (currentTargetInputId === 'reg-isbn') {
+        // 下段のCコード (192...) を読んだ場合
+        if (/^192\d{10}$/.test(code)) {
+          playBeep(330, 0.25); // 低音ブー警告音
+          setStatus('error', '⚠️ 下段の書籍コード(192)です。上の段(978...)を枠に合わせてください');
+          isCooldown = true;
+          setTimeout(() => {
+            if (!isScanning) return;
+            isCooldown = false;
+            setStatus('ready', `${currentTargetLabel}を枠に合わせてください`);
+          }, 1500);
+          return;
+        }
+
+        // 978/979から始まる13桁、または10桁ISBN以外（固有IDシール等の誤読）
+        const isIsbn = /^(978|979)\d{10}$/.test(code) || /^\d{9}[\dX]$/.test(code);
+        if (!isIsbn) {
+          playBeep(330, 0.2);
+          setStatus('error', '⚠️ 978から始まるISBNバーコードを枠に合わせてください');
+          isCooldown = true;
+          setTimeout(() => {
+            if (!isScanning) return;
+            isCooldown = false;
+            setStatus('ready', `${currentTargetLabel}を枠に合わせてください`);
+          }, 1400);
+          return;
+        }
+      }
 
       isScanning = false;
       isCooldown = true;
 
-      playBeep();
+      playBeep(1760, 0.12);
       scannerBox.classList.add('success-flash');
       successCodeDisplay.textContent = code;
       successOverlay.classList.add('visible');

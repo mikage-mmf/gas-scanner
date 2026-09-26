@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    // GAS実行時のWeb App正規URL注入 (ScriptApp.getService().getUrl())
+    window.GAS_APP_URL = "";
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>背表紙AI蔵書点検システム | Shelf AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+  :root {
+    --shelf-bg: #0b0f19;
+    --shelf-surface: #151d30;
+    --shelf-surface-glass: rgba(21, 29, 48, 0.85);
+    --shelf-border: rgba(255, 255, 255, 0.1);
+    --shelf-primary: #06b6d4;
+    --shelf-primary-hover: #0891b2;
+    --shelf-success: #10b981;
+    --shelf-danger: #f43f5e;
+    --shelf-warning: #f59e0b;
+    --shelf-text: #f8fafc;
+    --shelf-text-muted: #94a3b8;
+    --shelf-font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--shelf-bg);
+    color: var(--shelf-text);
+    font-family: var(--shelf-font);
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ヘッダー */
+  .shelf-header {
+    background: var(--shelf-surface-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--shelf-border);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .shelf-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .shelf-brand-icon {
+    font-size: 1.6rem;
+    background: linear-gradient(135deg, #06b6d4, #3b82f6);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+  }
+
+  .shelf-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+
+  .shelf-subtitle {
+    font-size: 0.75rem;
+    color: var(--shelf-text-muted);
+  }
+
+  .shelf-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .shelf-btn-tool {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--shelf-border);
+    color: var(--shelf-text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shelf-btn-tool:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* メインレイアウト */
+  .shelf-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* コントロールバー（棚選択・撮影モード） */
+  .shelf-control-bar {
+    background: var(--shelf-surface);
+    border: 1px solid var(--shelf-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .shelf-selector-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .shelf-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--shelf-border);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .shelf-badge {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--shelf-primary);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* カメラ・ビューファインダー */
+  .shelf-viewfinder-card {
+    background: #000;
+    border: 1px solid var(--shelf-border);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    aspect-ratio: 16 / 9;
+    max-height: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #shelf-video, #shelf-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* ガイドラインオーバーレイ */
+  .shelf-guide-overlay {
+    position: absolute;
+    inset: 16px;
+    border: 2px dashed rgba(6, 182, 212, 0.6);
+    border-radius: 12px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px;
+    transition: all 0.3s;
+  }
+
+  .shelf-guide-text {
+    align-self: center;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--shelf-primary);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(6, 182, 212, 0.3);
+  }
+
+  .shelf-guide-shelfline {
+    border-bottom: 2px solid rgba(16, 185, 129, 0.8);
+    width: 100%;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .shelf-guide-shelfline span {
+    background: rgba(16, 185, 129, 0.9);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transform: translateY(50%);
+  }
+
+  /* バウンディングボックス重畳レイヤー */
+  .shelf-bbox-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .shelf-bbox {
+    position: absolute;
+    border: 2.5px solid var(--shelf-success);
+    background: rgba(16, 185, 129, 0.15);
+    border-radius: 6px;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 4px;
+  }
+
+  .shelf-bbox:hover, .shelf-bbox.active {
+    background: rgba(16, 185, 129, 0.35);
+    transform: scale(1.02);
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+    z-index: 10;
+  }
+
+  /* 乱架（並び間違い）の強調スタイル */
+  .shelf-bbox.misplaced {
+    border-color: var(--shelf-danger);
+    background: rgba(244, 63, 94, 0.25);
+    animation: shelfPulseDanger 1.8s infinite;
+  }
+
+  .shelf-bbox.misplaced:hover, .shelf-bbox.misplaced.active {
+    background: rgba(244, 63, 94, 0.45);
+    box-shadow: 0 0 20px rgba(244, 63, 94, 0.8);
+    z-index: 10;
+  }
+
+  .shelf-bbox.unknown {
+    border-color: var(--shelf-warning);
+    background: rgba(245, 158, 11, 0.2);
+  }
+
+  @keyframes shelfPulseDanger {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 16px 4px rgba(244, 63, 94, 0.8);
+    }
+  }
+
+  .shelf-bbox-tag {
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+
+  .shelf-bbox.misplaced .shelf-bbox-tag {
+    background: var(--shelf-danger);
+  }
+
+  /* カメラ下部コントロール（シャッター等） */
+  .shelf-shutter-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    padding: 8px 0;
+  }
+
+  .shelf-btn-shutter {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #fff;
+    border: 5px solid var(--shelf-primary);
+    box-shadow: 0 0 24px rgba(6, 182, 212, 0.6);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+  }
+
+  .shelf-btn-shutter:hover {
+    transform: scale(1.08);
+  }
+
+  .shelf-btn-shutter:active {
+    transform: scale(0.95);
+  }
+
+  .shelf-btn-secondary {
+    background: var(--shelf-surface);
+    border: 1px solid var(--shelf-border);
+    color: var(--shelf-text);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .shelf-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* 解析サマリーカード */
+  .shelf-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .shelf-stat-card {
+    background: var(--shelf-surface);
+    border: 1px solid var(--shelf-border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .shelf-stat-label {
+    font-size: 0.75rem;
+    color: var(--shelf-text-muted);
+    font-weight: 600;
+  }
+
+  .shelf-stat-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .shelf-stat-value.success { color: var(--shelf-success); }
+  .shelf-stat-value.danger { color: var(--shelf-danger); }
+  .shelf-stat-value.warning { color: var(--shelf-warning); }
+
+  /* 検出書籍リスト（カルーセル・グリッド） */
+  .shelf-results-section {
+    background: var(--shelf-surface);
+    border: 1px solid var(--shelf-border);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .shelf-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .shelf-results-title {
+    font-size: 1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .shelf-books-track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--shelf-border) transparent;
+  }
+
+  .shelf-book-card {
+    flex: 0 0 200px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--shelf-border);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .shelf-book-card:hover, .shelf-book-card.active {
+    border-color: var(--shelf-primary);
+    background: rgba(6, 182, 212, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .shelf-book-card.is-misplaced {
+    border-color: var(--shelf-danger);
+    background: rgba(244, 63, 94, 0.1);
+  }
+
+  .shelf-card-badge {
+    align-self: flex-start;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .shelf-card-badge.normal {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--shelf-success);
+  }
+
+  .shelf-card-badge.misplaced {
+    background: rgba(244, 63, 94, 0.25);
+    color: var(--shelf-danger);
+  }
+
+  .shelf-card-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .shelf-card-meta {
+    font-size: 0.75rem;
+    color: var(--shelf-text-muted);
+  }
+
+  /* 点検確定フッターアクション */
+  .shelf-footer-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .shelf-btn-primary {
+    flex: 1;
+    background: linear-gradient(135deg, #10b981, #059669);
+    border: none;
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .shelf-btn-primary:hover {
+    filter: brightness(1.1);
+  }
+
+  /* ローディングオーバーレイ */
+  .shelf-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 15, 25, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 40;
+    display: none;
+  }
+
+  .shelf-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--shelf-primary);
+    border-radius: 50%;
+    animation: shelfSpin 0.8s linear infinite;
+  }
+
+  @keyframes shelfSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 設定モーダル */
+  .shelf-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    display: none;
+  }
+
+  .shelf-modal-card {
+    background: var(--shelf-surface);
+    border: 1px solid var(--shelf-border);
+    border-radius: 16px;
+    max-width: 480px;
+    width: 100%;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .shelf-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--shelf-border);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    width: 100%;
+  }
+
+  /* ========================================================
+   * ARスマート本探しモード (AR Visual Book Finder) 専用スタイル
+   * ======================================================== */
+
+  /* モード切替タブバー */
+  .shelf-mode-nav-wrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .shelf-mode-nav {
+    display: flex;
+    gap: 6px;
+    background: rgba(21, 29, 48, 0.95);
+    border: 1px solid var(--shelf-border);
+    border-radius: 14px;
+    padding: 5px;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .shelf-mode-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--shelf-text-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .shelf-mode-tab:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .shelf-mode-tab.active {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(59, 130, 246, 0.3));
+    border: 1px solid rgba(6, 182, 212, 0.5);
+    box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3);
+  }
+
+  .shelf-mode-tab[data-mode="find"].active {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(234, 88, 12, 0.35));
+    border: 1px solid rgba(245, 158, 11, 0.6);
+    box-shadow: 0 2px 12px rgba(245, 158, 11, 0.35);
+  }
+
+  .shelf-mode-pill {
+    background: linear-gradient(135deg, #f59e0b, #ea580c);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 10px;
+    letter-spacing: 0.05em;
+  }
+
+  /* AR本探しターゲットバー */
+  .shelf-find-bar {
+    background: linear-gradient(135deg, rgba(30, 27, 46, 0.95), rgba(20, 25, 45, 0.95));
+    border: 1.5px solid rgba(245, 158, 11, 0.4);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
+  }
+
+  .shelf-target-info-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 200px;
+    flex: 1;
+  }
+
+  .shelf-target-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #f59e0b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shelf-target-details {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .shelf-target-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+
+  .shelf-target-badge {
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fde68a;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  .shelf-target-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ターゲット書籍のゴールドネオンハイライト */
+  .shelf-bbox.target {
+    border: 3.5px solid #facc15 !important;
+    background: rgba(250, 204, 21, 0.32) !important;
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.9), inset 0 0 16px rgba(250, 204, 21, 0.45) !important;
+    z-index: 25 !important;
+    animation: shelfPulseTarget 1.4s infinite alternate !important;
+  }
+
+  .shelf-bbox.target .shelf-bbox-tag {
+    background: linear-gradient(135deg, #facc15, #f59e0b) !important;
+    color: #0f172a !important;
+    font-weight: 900 !important;
+    font-size: 0.72rem !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  @keyframes shelfPulseTarget {
+    0% {
+      box-shadow: 0 0 16px rgba(250, 204, 21, 0.7), inset 0 0 10px rgba(250, 204, 21, 0.3);
+      transform: scale(1.01);
+    }
+    100% {
+      box-shadow: 0 0 32px 8px rgba(250, 204, 21, 1), inset 0 0 22px rgba(250, 204, 21, 0.6);
+      transform: scale(1.035);
+    }
+  }
+
+  /* 非ターゲット本のスポットライト減光効果 */
+  .shelf-bbox.dimmed {
+    opacity: 0.2 !important;
+    filter: grayscale(80%) brightness(0.5) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    pointer-events: none !important;
+  }
+
+  /* ターゲット指差しピン（👇 ここです！） */
+  .shelf-target-pin {
+    position: absolute;
+    top: -46px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #facc15, #f59e0b);
+    color: #0f172a;
+    font-weight: 900;
+    font-size: 0.82rem;
+    padding: 5px 12px;
+    border-radius: 20px;
+    box-shadow: 0 4px 18px rgba(250, 204, 21, 0.8);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    animation: shelfBouncePin 1.2s infinite;
+    pointer-events: none;
+    z-index: 30;
+  }
+
+  .shelf-target-pin::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px 6px 0;
+    border-style: solid;
+    border-color: #f59e0b transparent transparent;
+    display: block;
+    width: 0;
+  }
+
+  @keyframes shelfBouncePin {
+    0%, 100% {
+      transform: translateX(-50%) translateY(0);
+    }
+    50% {
+      transform: translateX(-50%) translateY(-10px);
+    }
+  }
+
+  /* 発見通知バナー（ビューファインダー上部） */
+  .shelf-target-found-banner {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.94);
+    border: 2px solid #facc15;
+    color: #fff;
+    padding: 9px 20px;
+    border-radius: 30px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 35;
+    animation: shelfSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+  }
+
+  .shelf-target-notfound-banner {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.94);
+    border: 2px solid #f59e0b;
+    color: #fde68a;
+    padding: 9px 20px;
+    border-radius: 30px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 35;
+    animation: shelfSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 90%;
+    text-align: center;
+  }
+
+  @keyframes shelfSlideDown {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  /* AR本探し サマリーカード */
+  .shelf-find-summary-card {
+    background: linear-gradient(135deg, rgba(21, 29, 48, 0.95), rgba(30, 27, 46, 0.95));
+    border: 1.5px solid rgba(245, 158, 11, 0.3);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    align-items: center;
+  }
+
+  .shelf-find-stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .shelf-find-stat-label {
+    font-size: 0.75rem;
+    color: var(--shelf-text-muted);
+    font-weight: 600;
+  }
+
+  .shelf-find-stat-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .shelf-find-status-pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shelf-find-status-pill.found {
+    background: rgba(250, 204, 21, 0.2);
+    color: #facc15;
+    border: 1px solid rgba(250, 204, 21, 0.6);
+  }
+
+  .shelf-find-status-pill.searching {
+    background: rgba(6, 182, 212, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(6, 182, 212, 0.5);
+  }
+
+  /* 本探し用クイック候補チップ */
+  .shelf-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .shelf-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--shelf-border);
+    color: #f1f5f9;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .shelf-chip:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #fde68a;
+  }
+
+  /* 本選択ピッカーリスト */
+  .shelf-picker-results {
+    max-height: 45vh;
+    overflow-y: auto;
+    border: 1px solid var(--shelf-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    divide-y: 1px solid var(--shelf-border);
+  }
+
+  .shelf-picker-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--shelf-border);
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .shelf-picker-item:last-child {
+    border-bottom: none;
+  }
+
+  .shelf-picker-item:hover {
+    background: rgba(245, 158, 11, 0.15);
+  }
+
+  .shelf-picker-item-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .shelf-picker-item-sub {
+    font-size: 0.78rem;
+    color: var(--shelf-text-muted);
+    margin-top: 2px;
+  }
+
+  /* 本棚カードのターゲットハイライト */
+  .shelf-book-card.is-target {
+    border: 2px solid #facc15 !important;
+    background: rgba(250, 204, 21, 0.18) !important;
+    box-shadow: 0 0 16px rgba(250, 204, 21, 0.4) !important;
+  }
+
+  .shelf-card-badge.target {
+    background: linear-gradient(135deg, #facc15, #f59e0b) !important;
+    color: #0f172a !important;
+    font-weight: 900 !important;
+  }
+</style>
+
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header class="shelf-header">
+    <div class="shelf-brand">
+      <div class="shelf-brand-icon">📸</div>
+      <div>
+        <h1 class="shelf-title">背表紙AI蔵書点検</h1>
+        <p class="shelf-subtitle">Shelf Spine AI Inspector</p>
+      </div>
+    </div>
+    <div class="shelf-header-actions">
+      <button type="button" class="shelf-btn-tool" id="btn-shelf-logs" title="過去の点検履歴">
+        📋 <span>点検履歴</span>
+      </button>
+      <button type="button" class="shelf-btn-tool" id="btn-shelf-settings" title="設定">
+        ⚙️ <span>設定</span>
+      </button>
+      <a id="btn-shelf-nav-kiosk" href="?mode=kiosk" class="shelf-btn-tool" style="text-decoration: none;" title="キオスク画面へ" target="_top">
+        🖥️
+      </a>
+      <a id="btn-shelf-nav-main" href="./" class="shelf-btn-tool" style="text-decoration: none;" title="図書管理システムへ" target="_top">
+        🏠 戻る
+      </a>
+    </div>
+  </header>
+
+  <!-- メインコンテナ -->
+  <main class="shelf-container">
+
+    <!-- モード切替タブバー (蔵書点検 vs AR本探し) -->
+    <div class="shelf-mode-nav-wrap">
+      <div class="shelf-mode-nav">
+        <button type="button" class="shelf-mode-tab active" id="tab-mode-inventory" data-mode="inventory">
+          📋 <span>蔵書点検</span>
+        </button>
+        <button type="button" class="shelf-mode-tab" id="tab-mode-find" data-mode="find">
+          🔍 <span>AR本探し</span>
+          <span class="shelf-mode-pill">AR</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. 蔵書点検モード用コントロールバー（棚選択 & ステータス） -->
+    <div class="shelf-control-bar" id="shelf-inventory-bar">
+      <div class="shelf-selector-group">
+        <label for="shelf-id-select" style="font-size: 0.85rem; font-weight: 700; color: var(--shelf-text-muted);">
+          📍 点検対象の書架：
+        </label>
+        <select id="shelf-id-select" class="shelf-select">
+          <optgroup label="文学・小説 (900)">
+            <option value="A-1" selected>A-1 (日本文学・小説 913)</option>
+            <option value="A-2">A-2 (日本文学・古典 910-912)</option>
+            <option value="A-3">A-3 (英米・海外文学 930-990)</option>
+          </optgroup>
+          <optgroup label="自然科学・技術 (400-500)">
+            <option value="B-1">B-1 (理科・生物 460-480)</option>
+            <option value="B-2">B-2 (宇宙・地球 440-450)</option>
+          </optgroup>
+          <optgroup label="歴史・社会 (200-300)">
+            <option value="C-1">C-1 (日本史・世界史 210-220)</option>
+            <option value="C-2">C-2 (社会・政治・経済 300-330)</option>
+          </optgroup>
+          <optgroup label="絵本・児童書 (E)">
+            <option value="D-1">D-1 (大型絵本・低学年向け)</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="shelf-badge">🤖 Gemini Vision 連携</span>
+        <button type="button" class="shelf-btn-secondary" id="btn-shelf-upload" style="padding: 6px 12px; font-size: 0.8rem;">
+          📁 写真を選択
+        </button>
+        <input type="file" id="shelf-file-input" accept="image/*" style="display: none;">
+      </div>
+    </div>
+
+    <!-- 2. AR本探しモード用コントロールバー（探す本の指定 & 切替） -->
+    <div class="shelf-find-bar" id="shelf-find-bar" style="display: none;">
+      <div class="shelf-target-info-box">
+        <div class="shelf-target-label">
+          <span>🎯 探している本</span>
+          <span style="font-size: 0.7rem; color: var(--shelf-text-muted); font-weight: normal;">(カメラを本棚に向けて撮影すると位置をハイライト)</span>
+        </div>
+        <div class="shelf-target-details" id="shelf-target-details">
+          <span class="shelf-target-title" id="shelf-target-title">『坊っちゃん』(夏目 漱石)</span>
+          <span class="shelf-target-badge" id="shelf-target-callnum">913.6/ナ</span>
+        </div>
+      </div>
+      <div class="shelf-target-actions">
+        <button type="button" class="shelf-btn-secondary" id="btn-open-book-picker" style="padding: 8px 14px; font-size: 0.85rem;">
+          🔍 本を変更
+        </button>
+        <button type="button" class="shelf-btn-secondary" id="btn-shelf-upload-find" style="padding: 8px 12px; font-size: 0.85rem;" title="写真を直接選んで探す">
+          📁 写真
+        </button>
+      </div>
+    </div>
+
+    <!-- カメラ・ビューファインダー（画像 & バウンディングボックス表示） -->
+    <div class="shelf-viewfinder-card">
+      <video id="shelf-video" autoplay playsinline muted></video>
+      <canvas id="shelf-canvas" style="display: none;"></canvas>
+
+      <!-- ガイドラインオーバーレイ（撮影前） -->
+      <div id="shelf-guide-overlay" class="shelf-guide-overlay">
+        <div class="shelf-guide-text" id="shelf-guide-text">📖 本棚を枠内に収めて撮影してください（1段でも複数段でも認識可能）</div>
+        <div class="shelf-guide-shelfline">
+          <span>書架の棚板ライン</span>
+        </div>
+      </div>
+
+      <!-- ターゲット発見通知バナー（AR本探し用） -->
+      <div id="shelf-target-found-banner" class="shelf-target-found-banner" style="display: none;">
+        <span style="font-size: 1.2rem;">✨</span>
+        <span id="shelf-target-found-text">見つかりました！ 左から <strong>2番目</strong> の本です</span>
+      </div>
+
+      <!-- 未発見通知案内バナー（AR本探し用） -->
+      <div id="shelf-target-notfound-banner" class="shelf-target-notfound-banner" style="display: none;">
+        <span>🔍 この画角内には見当たりませんでした。本棚の別の段や左右を写してみてください。</span>
+      </div>
+
+      <!-- バウンディングボックス重畳レイヤー（解析後） -->
+      <div id="shelf-bbox-layer" class="shelf-bbox-layer" style="display: none;"></div>
+
+      <!-- 解析ローディング -->
+      <div id="shelf-loading-overlay" class="shelf-loading-overlay">
+        <div class="shelf-spinner"></div>
+        <div id="shelf-loading-text" style="color: #fff; font-weight: 700; text-align: center; white-space: pre-line;">
+          背表紙をAIが解析中...
+        </div>
+      </div>
+    </div>
+
+    <!-- シャッターコントロールバー -->
+    <div class="shelf-shutter-bar">
+      <button type="button" class="shelf-btn-shutter" id="btn-shelf-shutter" title="本棚を撮影して解析">
+        📸
+      </button>
+      <button type="button" class="shelf-btn-secondary" id="btn-shelf-retake" style="display: none;">
+        🔄 もう一度撮影する
+      </button>
+    </div>
+
+    <!-- 1. 蔵書点検サマリー統計（点検モード時） -->
+    <div class="shelf-summary-grid" id="shelf-inventory-summary">
+      <div class="shelf-stat-card">
+        <div class="shelf-stat-label">検出書籍総数</div>
+        <div class="shelf-stat-value" id="stat-total-count">0</div>
+      </div>
+      <div class="shelf-stat-card">
+        <div class="shelf-stat-label">正常配架</div>
+        <div class="shelf-stat-value success" id="stat-normal-count">0</div>
+      </div>
+      <div class="shelf-stat-card">
+        <div class="shelf-stat-label">乱架（並び違い）</div>
+        <div class="shelf-stat-value danger" id="stat-misplaced-count">0</div>
+      </div>
+      <div class="shelf-stat-card">
+        <div class="shelf-stat-label">未登録・不明</div>
+        <div class="shelf-stat-value warning" id="stat-unknown-count">0</div>
+      </div>
+    </div>
+
+    <!-- 2. AR本探しサマリーカード（AR本探しモード時） -->
+    <div class="shelf-find-summary-card" id="shelf-find-summary" style="display: none;">
+      <div class="shelf-find-stat-item">
+        <div class="shelf-find-stat-label">探索ステータス</div>
+        <div class="shelf-find-stat-val">
+          <span class="shelf-find-status-pill searching" id="shelf-find-status-pill">
+            <span>📷</span> <span>本棚を撮影してください</span>
+          </span>
+        </div>
+      </div>
+      <div class="shelf-find-stat-item">
+        <div class="shelf-find-stat-label">本棚での位置</div>
+        <div class="shelf-find-stat-val" id="shelf-find-position-val" style="color: #facc15;">
+          ---
+        </div>
+      </div>
+      <div class="shelf-find-stat-item">
+        <div class="shelf-find-stat-label">画角内の認識冊数</div>
+        <div class="shelf-find-stat-val" id="shelf-find-count-val">
+          0 冊
+        </div>
+      </div>
+    </div>
+
+    <!-- 検出書籍スワイプリスト -->
+    <div class="shelf-results-section">
+      <div class="shelf-results-header">
+        <h3 class="shelf-results-title">
+          <span id="shelf-results-section-title">📚 検出された書籍一覧（左から右への順）</span>
+        </h3>
+        <span style="font-size: 0.75rem; color: var(--shelf-text-muted);">本をタップすると位置を表示</span>
+      </div>
+
+      <div class="shelf-books-track" id="shelf-books-track">
+        <div style="color: var(--shelf-text-muted); font-size: 0.85rem; padding: 12px;" id="shelf-books-empty-hint">
+          本棚を撮影すると、検出された書籍の一覧と判定結果がここに表示されます。
+        </div>
+      </div>
+
+      <!-- 点検確定アクション（点検モード用） -->
+      <div class="shelf-footer-actions" id="shelf-inventory-footer-actions">
+        <button type="button" class="shelf-btn-primary" id="btn-shelf-confirm-inventory" disabled>
+          <span>📋 この棚の点検を確定して記録</span>
+        </button>
+      </div>
+
+      <!-- AR本探しアクション（AR本探しモード用） -->
+      <div class="shelf-footer-actions" id="shelf-find-footer-actions" style="display: none;">
+        <button type="button" class="shelf-btn-primary" id="btn-shelf-find-next" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+          <span>🔍 別の本を探す</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 設定モーダル（Gemini APIキー等） -->
+  <div class="shelf-modal-backdrop" id="shelf-settings-modal">
+    <div class="shelf-modal-card">
+      <h3 style="font-size: 1.1rem; color: #fff;">⚙️ 背表紙AI 設定</h3>
+      <p style="font-size: 0.8rem; color: var(--shelf-text-muted); line-height: 1.5;">
+        Google AI Studio（Gemini API）のAPIキーを設定すると、実際のAIによる画像解析が有効になります。空欄の場合は内蔵のシミュレーションモードで動作します。
+      </p>
+
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.8rem; color: #fff; font-weight: 600;">
+            使用するAIモデル:
+          </label>
+          <button type="button" id="btn-shelf-sync-models" class="shelf-btn-secondary" style="padding: 2px 8px; font-size: 0.72rem; gap: 4px;" title="Googleから現在アクティブな最新モデル一覧を同期">
+            🔄 <span>Googleから最新同期</span>
+          </button>
+        </div>
+        <select id="shelf-model-select" class="shelf-select" style="width: 100%;">
+          <option value="gemini-3.8-flash" selected>🚀 gemini-3.8-flash (最新・最高性能・推奨)</option>
+          <option value="gemini-3.5-flash">⚡ gemini-3.5-flash (長期安定版・2027年まで)</option>
+          <option value="gemini-3.5-flash-lite">🍃 gemini-3.5-flash-lite (最軽量・超高速)</option>
+        </select>
+        <small style="color: var(--shelf-text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">
+          ※万一モデルが廃止された場合も、バックエンドが自動で最新Flashモデルを解決して再試行します。
+        </small>
+      </div>
+
+      <div>
+        <label style="font-size: 0.8rem; color: #fff; font-weight: 600; display: block; margin-bottom: 6px;">
+          Gemini API キー (任意):
+        </label>
+        <input type="password" id="shelf-api-key-input" class="shelf-input" placeholder="AIzaSy...">
+        <small style="color: var(--shelf-text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">
+          ※キーはお使いの端末のブラウザ（LocalStorage）にのみ安全に保存されます。
+        </small>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+        <button type="button" class="shelf-btn-secondary" id="btn-shelf-close-settings">閉じる</button>
+        <button type="button" class="shelf-btn-primary" id="btn-shelf-save-settings" style="flex: none; padding: 10px 20px;">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 点検履歴モーダル -->
+  <div class="shelf-modal-backdrop" id="shelf-logs-modal" style="display: none;">
+    <div class="shelf-modal-card" style="max-width: 720px; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 1.15rem; color: #fff;">📋 過去の蔵書点検履歴</h3>
+        <button type="button" class="shelf-btn-secondary" id="btn-shelf-close-logs" style="padding: 4px 10px;">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--shelf-text-muted);">
+        スプレッドシート（INVENTORY_LOGS）に記録された直近の点検結果一覧です。
+      </p>
+
+      <div style="overflow-y: auto; max-height: 55vh; border: 1px solid var(--shelf-border); border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+          <thead style="background: rgba(255,255,255,0.05); position: sticky; top: 0; color: var(--shelf-text-muted);">
+            <tr>
+              <th style="padding: 10px;">点検日時</th>
+              <th style="padding: 10px;">棚番号</th>
+              <th style="padding: 10px;">総数</th>
+              <th style="padding: 10px; color: var(--shelf-success);">正常</th>
+              <th style="padding: 10px; color: var(--shelf-danger);">乱架</th>
+              <th style="padding: 10px;">担当</th>
+            </tr>
+          </thead>
+          <tbody id="shelf-logs-table-body">
+            <tr>
+              <td colspan="6" style="padding: 24px; text-align: center; color: var(--shelf-text-muted);">読み込み中...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 本検索・選択ピッカーモーダル（AR本探し用） -->
+  <div class="shelf-modal-backdrop" id="shelf-book-picker-modal" style="display: none;">
+    <div class="shelf-modal-card" style="max-width: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 1.15rem; color: #fff;">🔍 探す本を選択・検索</h3>
+        <button type="button" class="shelf-btn-secondary" id="btn-close-book-picker" style="padding: 4px 10px;">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--shelf-text-muted);">
+        探したい本のタイトル・著者名・蔵書IDを入力するか、下のサンプル候補から選んでください。
+      </p>
+
+      <!-- 検索入力バー -->
+      <div style="position: relative;">
+        <input type="text" id="shelf-picker-search-input" class="shelf-input" placeholder="書名・著者名・蔵書IDを入力して検索..." autofocus>
+      </div>
+
+      <!-- クイック候補チップ -->
+      <div>
+        <div style="font-size: 0.75rem; color: var(--shelf-text-muted); font-weight: 700; margin-bottom: 4px;">
+          ⚡ クイック選択候補（デモ・人気図書）:
+        </div>
+        <div class="shelf-chip-group" id="shelf-quick-chips">
+          <button type="button" class="shelf-chip" data-title="坊っちゃん" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100002">
+            📖 坊っちゃん (上段)
+          </button>
+          <button type="button" class="shelf-chip" data-title="吾輩は猫である" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100001">
+            🐱 吾輩は猫である (上段)
+          </button>
+          <button type="button" class="shelf-chip" data-title="こころ" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100004">
+            💭 こころ (下段)
+          </button>
+          <button type="button" class="shelf-chip" data-title="銀河鉄道の夜" data-author="宮沢 賢治" data-callnum="913.6/ミ" data-id="100005">
+            🌌 銀河鉄道の夜 (下段)
+          </button>
+          <button type="button" class="shelf-chip" data-title="ハリー・ポッターと賢者の石" data-author="J.K.ローリング" data-callnum="933/ロ" data-id="100006">
+            ⚡ ハリー・ポッター (下段)
+          </button>
+        </div>
+      </div>
+
+      <!-- 蔵書検索結果リスト -->
+      <div>
+        <div style="font-size: 0.75rem; color: var(--shelf-text-muted); font-weight: 700; margin-bottom: 4px;">
+          検索結果:
+        </div>
+        <div class="shelf-picker-results" id="shelf-picker-results">
+          <div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">
+            上の入力欄にキーワードを入力するか、候補チップをクリックしてください。
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+        <button type="button" class="shelf-btn-secondary" id="btn-cancel-book-picker">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /**
+   * js_shelf_ai.html - 背表紙画像解析AI 蔵書点検 & AR本探し クライアントコントローラー
+   */
+  (function() {
+    'use strict';
+
+    // 状態管理
+    let currentMode = 'inventory'; // 'inventory' | 'find'
+    let currentStream = null;
+    let currentShelfId = 'A-1';
+    let lastCapturedBase64 = null;
+    let lastAnalysisResult = null;
+    let selectedSpineIndex = null;
+    let searchDebounceTimer = null;
+
+    // 探索ターゲット本（AR本探しモード用）
+    let targetBook = {
+      id: '100002',
+      title: '坊っちゃん',
+      author: '夏目 漱石',
+      callNumber: '913.6/ナ'
+    };
+
+    // DOM要素: モードタブ & コントロール
+    const tabInventory = document.getElementById('tab-mode-inventory');
+    const tabFind = document.getElementById('tab-mode-find');
+    const inventoryBar = document.getElementById('shelf-inventory-bar');
+    const findBar = document.getElementById('shelf-find-bar');
+    const targetTitleEl = document.getElementById('shelf-target-title');
+    const targetCallnumEl = document.getElementById('shelf-target-callnum');
+    const openBookPickerBtn = document.getElementById('btn-open-book-picker');
+    const uploadFindBtn = document.getElementById('btn-shelf-upload-find');
+
+    // DOM要素: カメラ & ビューファインダー
+    const video = document.getElementById('shelf-video');
+    const canvas = document.getElementById('shelf-canvas');
+    const bboxLayer = document.getElementById('shelf-bbox-layer');
+    const shutterBtn = document.getElementById('btn-shelf-shutter');
+    const retakeBtn = document.getElementById('btn-shelf-retake');
+    const uploadInput = document.getElementById('shelf-file-input');
+    const uploadBtn = document.getElementById('btn-shelf-upload');
+    const shelfSelect = document.getElementById('shelf-id-select');
+    const guideOverlay = document.getElementById('shelf-guide-overlay');
+    const guideText = document.getElementById('shelf-guide-text');
+    const loadingOverlay = document.getElementById('shelf-loading-overlay');
+    const loadingText = document.getElementById('shelf-loading-text');
+
+    // DOM要素: AR発見バナー
+    const targetFoundBanner = document.getElementById('shelf-target-found-banner');
+    const targetFoundText = document.getElementById('shelf-target-found-text');
+    const targetNotFoundBanner = document.getElementById('shelf-target-notfound-banner');
+
+    // DOM要素: サマリー & リスト
+    const inventorySummary = document.getElementById('shelf-inventory-summary');
+    const findSummary = document.getElementById('shelf-find-summary');
+    const findStatusPill = document.getElementById('shelf-find-status-pill');
+    const findPositionVal = document.getElementById('shelf-find-position-val');
+    const findCountVal = document.getElementById('shelf-find-count-val');
+    const resultsSectionTitle = document.getElementById('shelf-results-section-title');
+    const booksTrack = document.getElementById('shelf-books-track');
+    const inventoryFooterActions = document.getElementById('shelf-inventory-footer-actions');
+    const findFooterActions = document.getElementById('shelf-find-footer-actions');
+    const confirmBtn = document.getElementById('btn-shelf-confirm-inventory');
+    const findNextBtn = document.getElementById('btn-shelf-find-next');
+
+    // DOM要素: モーダル各種
+    const logsBtn = document.getElementById('btn-shelf-logs');
+    const logsModal = document.getElementById('shelf-logs-modal');
+    const closeLogsBtn = document.getElementById('btn-shelf-close-logs');
+    const logsTableBody = document.getElementById('shelf-logs-table-body');
+    const settingsBtn = document.getElementById('btn-shelf-settings');
+    const settingsModal = document.getElementById('shelf-settings-modal');
+    const modelSelect = document.getElementById('shelf-model-select');
+    const syncModelsBtn = document.getElementById('btn-shelf-sync-models');
+    const apiKeyInput = document.getElementById('shelf-api-key-input');
+    const saveSettingsBtn = document.getElementById('btn-shelf-save-settings');
+    const closeSettingsBtn = document.getElementById('btn-shelf-close-settings');
+
+    // DOM要素: 本ピッカーモーダル
+    const bookPickerModal = document.getElementById('shelf-book-picker-modal');
+    const closeBookPickerBtn = document.getElementById('btn-close-book-picker');
+    const cancelBookPickerBtn = document.getElementById('btn-cancel-book-picker');
+    const pickerSearchInput = document.getElementById('shelf-picker-search-input');
+    const pickerResults = document.getElementById('shelf-picker-results');
+    const quickChips = document.getElementById('shelf-quick-chips');
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      initHeaderNavLinks();
+      initSettings();
+      parseUrlParameters();
+      startCamera();
+      bindEvents();
+    });
+
+    /**
+     * GAS Webアプリの正規URL (script.google.com/macros/s/.../exec) を取得
+     */
+    function getGasCanonicalExecUrl() {
+      if (typeof window.GAS_APP_URL === 'string' && window.GAS_APP_URL.startsWith('http')) {
+        return window.GAS_APP_URL.trim();
+      }
+      return 'https://script.google.com/macros/s/AKfycbyIaNK50vKYhZplhUU__0bxp9JP1be9mZOXSZyvk00/exec';
+    }
+
+    /**
+     * ヘッダーの戻る/キオスク遷移リンクを正規URLへ初期化 (userCodeAppPanel回避)
+     */
+    function initHeaderNavLinks() {
+      const isLocalFile = window.location && window.location.protocol === 'file:';
+      const canonicalGasUrl = 'https://script.google.com/macros/s/AKfycbyIaNK50vKYhZplhUU__0bxp9JP1be9mZOXSZyvk00/exec';
+      const mainUrl = isLocalFile ? 'library.html' : canonicalGasUrl;
+      const kioskUrl = isLocalFile ? 'library.html?mode=kiosk' : (canonicalGasUrl + '?mode=kiosk');
+
+      const navMain = document.getElementById('btn-shelf-nav-main');
+      if (navMain) {
+        navMain.href = mainUrl;
+        navMain.addEventListener('click', (e) => {
+          if (window.opener && !window.opener.closed) {
+            e.preventDefault();
+            window.close();
+            return;
+          }
+          if (window.top && window.top !== window) {
+            e.preventDefault();
+            window.top.location.href = mainUrl;
+          }
+        });
+      }
+
+      const navKiosk = document.getElementById('btn-shelf-nav-kiosk');
+      if (navKiosk) {
+        navKiosk.href = kioskUrl;
+        navKiosk.addEventListener('click', (e) => {
+          if (window.top && window.top !== window) {
+            e.preventDefault();
+            window.top.location.href = kioskUrl;
+          }
+        });
+      }
+    }
+
+    /**
+     * 設定の読み込み
+     */
+    function initSettings() {
+      const savedKey = localStorage.getItem('shelf_gemini_api_key') || '';
+      const savedModel = localStorage.getItem('shelf_gemini_model') || 'gemini-3.8-flash';
+      if (apiKeyInput) apiKeyInput.value = savedKey;
+      if (modelSelect) modelSelect.value = savedModel;
+      if (shelfSelect) currentShelfId = shelfSelect.value;
+
+      try {
+        const savedTarget = localStorage.getItem('shelf_target_book');
+        if (savedTarget) {
+          targetBook = Object.assign(targetBook, JSON.parse(savedTarget));
+        }
+      } catch (e) {}
+
+      updateTargetDisplay();
+    }
+
+    /**
+     * URLクエリパラメータの解析 (?app=shelf&mode=find&bookId=...&title=...)
+     */
+    function parseUrlParameters() {
+      let urlParams = null;
+      try {
+        urlParams = new URLSearchParams(window.location.search);
+      } catch (e) {}
+
+      const mode = urlParams?.get('mode') || urlParams?.get('submode');
+      const bookId = urlParams?.get('bookId');
+      const title = urlParams?.get('title');
+
+      if (title || bookId) {
+        setTargetBook({
+          id: bookId || '',
+          title: title || '指定書籍',
+          author: '',
+          callNumber: ''
+        });
+      }
+
+      if (mode === 'find' || title || bookId) {
+        setMode('find');
+      } else {
+        setMode('inventory');
+      }
+
+      // GASのiframe実行時用URLパラメータ取得
+      if (typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+        google.script.url.getLocation((loc) => {
+          if (loc && loc.parameter) {
+            const p = loc.parameter;
+            if (p.bookId || p.title) {
+              setTargetBook({
+                id: p.bookId || '',
+                title: p.title || '指定書籍',
+                author: '',
+                callNumber: ''
+              });
+            }
+            if (p.mode === 'find' || p.submode === 'find' || p.bookId || p.title) {
+              setMode('find');
+            }
+          }
+        });
+      }
+    }
+
+    /**
+     * モード切り替え (蔵書点検 vs AR本探し)
+     */
+    function setMode(mode) {
+      currentMode = mode === 'find' ? 'find' : 'inventory';
+
+      // タブアクティブ更新
+      if (tabInventory) tabInventory.classList.toggle('active', currentMode === 'inventory');
+      if (tabFind) tabFind.classList.toggle('active', currentMode === 'find');
+
+      // コントロールバー表示切替
+      if (inventoryBar) inventoryBar.style.display = currentMode === 'inventory' ? 'flex' : 'none';
+      if (findBar) findBar.style.display = currentMode === 'find' ? 'flex' : 'none';
+
+      // サマリーカード表示切替
+      if (inventorySummary) inventorySummary.style.display = currentMode === 'inventory' ? 'grid' : 'none';
+      if (findSummary) findSummary.style.display = currentMode === 'find' ? 'grid' : 'none';
+
+      // フッターアクション表示切替
+      if (inventoryFooterActions) inventoryFooterActions.style.display = currentMode === 'inventory' ? 'flex' : 'none';
+      if (findFooterActions) findFooterActions.style.display = currentMode === 'find' ? 'flex' : 'none';
+
+      // ガイドテキスト更新
+      if (guideText) {
+        guideText.textContent = currentMode === 'find'
+          ? `🎯 探している本『${targetBook.title}』がある棚を枠内に収めて撮影してください`
+          : '📖 本棚の1段を枠内に水平に収めて撮影してください';
+      }
+
+      // リストヘッダータイトル更新
+      if (resultsSectionTitle) {
+        resultsSectionTitle.textContent = currentMode === 'find'
+          ? '🎯 探索結果（検出された書籍）'
+          : '📚 検出された書籍一覧（左から右への順）';
+      }
+
+      // ビューファインダー内バナー初期化
+      if (targetFoundBanner) targetFoundBanner.style.display = 'none';
+      if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+
+      // 探索サマリーの初期化
+      if (currentMode === 'find') {
+        updateFindSummary(false, -1, 0, '📷 本棚を撮影してください');
+      }
+
+      // 以前の解析結果をリセット
+      clearResults();
+      if (video.style.display === 'none') {
+        startCamera();
+      }
+    }
+
+    /**
+     * 探索対象本の更新
+     */
+    function setTargetBook(book) {
+      if (!book) return;
+      targetBook = {
+        id: book.id || book.book_id || '',
+        title: book.title || '坊っちゃん',
+        author: book.author || '',
+        callNumber: book.callNumber || book.call_number || ''
+      };
+      updateTargetDisplay();
+      try {
+        localStorage.setItem('shelf_target_book', JSON.stringify(targetBook));
+      } catch (e) {}
+    }
+
+    function updateTargetDisplay() {
+      if (targetTitleEl) {
+        targetTitleEl.textContent = `『${targetBook.title}』${targetBook.author ? ` (${targetBook.author})` : ''}`;
+      }
+      if (targetCallnumEl) {
+        targetCallnumEl.textContent = targetBook.callNumber || (targetBook.id ? `ID: ${targetBook.id}` : '分類未設定');
+      }
+      if (guideText && currentMode === 'find') {
+        guideText.textContent = `🎯 探している本『${targetBook.title}』がある棚を枠内に収めて撮影してください`;
+      }
+    }
+
+    /**
+     * 発見チャイム再生 (Web Audio API による高音質ファンファーレ)
+     */
+    function playSuccessChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        // 上昇4和音ファンファーレ: C5, E5, G5, C6
+        const freqs = [523.25, 659.25, 783.99, 1046.50];
+        freqs.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + i * 0.08);
+          gain.gain.setValueAtTime(0.28, now + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.38);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.40);
+        });
+      } catch (e) {
+        console.warn('[Shelf Audio] チャイム再生エラー:', e);
+      }
+    }
+
+    /**
+     * カメラ起動 (背面カメラ優先)
+     */
+    async function startCamera() {
+      try {
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+        bboxLayer.innerHTML = '';
+        bboxLayer.style.display = 'none';
+        if (guideOverlay) guideOverlay.style.display = 'flex';
+        shutterBtn.style.display = 'flex';
+        retakeBtn.style.display = 'none';
+        if (targetFoundBanner) targetFoundBanner.style.display = 'none';
+        if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+      } catch (err) {
+        console.warn('[Shelf Camera] カメラ起動エラー:', err);
+        showShelfToast('カメラへのアクセスが許可されていません。「写真を選択」からテストできます。', 'warning');
+      }
+    }
+
+    /**
+     * イベントバインド
+     */
+    function bindEvents() {
+      // モード切替タブ
+      tabInventory.addEventListener('click', () => setMode('inventory'));
+      tabFind.addEventListener('click', () => setMode('find'));
+
+      // シャッター撮影
+      shutterBtn.addEventListener('click', captureAndAnalyze);
+
+      // もう一度撮影
+      retakeBtn.addEventListener('click', () => {
+        startCamera();
+        clearResults();
+      });
+
+      // 写真アップロード（ファイル選択）
+      uploadBtn.addEventListener('click', () => uploadInput.click());
+      if (uploadFindBtn) {
+        uploadFindBtn.addEventListener('click', () => uploadInput.click());
+      }
+      uploadInput.addEventListener('change', handleFileUpload);
+
+      // 棚選択切り替え（点検モード）
+      shelfSelect.addEventListener('change', (e) => {
+        currentShelfId = e.target.value;
+        showShelfToast(`対象棚を【${currentShelfId}】に切り替えました`, 'info');
+      });
+
+      // 点検確定（点検モード）
+      confirmBtn.addEventListener('click', saveInventory);
+
+      // AR本探し: 探す本の変更モーダルを開く
+      if (openBookPickerBtn) {
+        openBookPickerBtn.addEventListener('click', openBookPicker);
+      }
+      if (findNextBtn) {
+        findNextBtn.addEventListener('click', openBookPicker);
+      }
+
+      // 本ピッカーモーダル閉じる
+      if (closeBookPickerBtn) {
+        closeBookPickerBtn.addEventListener('click', () => {
+          bookPickerModal.style.display = 'none';
+        });
+      }
+      if (cancelBookPickerBtn) {
+        cancelBookPickerBtn.addEventListener('click', () => {
+          bookPickerModal.style.display = 'none';
+        });
+      }
+
+      // クイック選択チップ
+      if (quickChips) {
+        quickChips.querySelectorAll('.shelf-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const id = chip.getAttribute('data-id');
+            const title = chip.getAttribute('data-title');
+            const author = chip.getAttribute('data-author');
+            const callnum = chip.getAttribute('data-callnum');
+            setTargetBook({ id, title, author, callNumber: callnum });
+            bookPickerModal.style.display = 'none';
+            showShelfToast(`🎯 探す本を『${title}』に設定しました`, 'info');
+          });
+        });
+      }
+
+      // 本検索入力
+      if (pickerSearchInput) {
+        pickerSearchInput.addEventListener('input', (e) => {
+          clearTimeout(searchDebounceTimer);
+          const q = (e.target.value || '').trim();
+          searchDebounceTimer = setTimeout(() => searchBooksForPicker(q), 300);
+        });
+      }
+
+      // 点検履歴モーダル
+      if (logsBtn) {
+        logsBtn.addEventListener('click', openLogsModal);
+      }
+      if (closeLogsBtn) {
+        closeLogsBtn.addEventListener('click', () => {
+          logsModal.style.display = 'none';
+        });
+      }
+
+      // 設定モーダル
+      settingsBtn.addEventListener('click', () => {
+        settingsModal.style.display = 'flex';
+      });
+      closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.style.display = 'none';
+      });
+      if (syncModelsBtn) {
+        syncModelsBtn.addEventListener('click', syncActiveModelsFromGoogle);
+      }
+      saveSettingsBtn.addEventListener('click', () => {
+        const key = (apiKeyInput.value || '').trim();
+        const model = modelSelect ? modelSelect.value : 'gemini-3.8-flash';
+        localStorage.setItem('shelf_gemini_api_key', key);
+        localStorage.setItem('shelf_gemini_model', model);
+        settingsModal.style.display = 'none';
+        showShelfToast(key ? `設定を保存しました (${model})` : 'シミュレーションモードで動作します', 'success');
+      });
+    }
+
+    /**
+     * 探す本ピッカーモーダルを開く
+     */
+    function openBookPicker() {
+      if (!bookPickerModal) return;
+      bookPickerModal.style.display = 'flex';
+      if (pickerSearchInput) {
+        pickerSearchInput.value = '';
+        pickerSearchInput.focus();
+      }
+      renderSampleSearchResults();
+    }
+
+    /**
+     * サンプル検索結果の初期描画
+     */
+    function renderSampleSearchResults() {
+      if (!pickerResults) return;
+      const samples = [
+        { book_id: '100002', title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+        { book_id: '100001', title: '吾輩は猫である', author: '夏目 漱石', publisher: '岩波文庫', call_number: '913.6/ナ' },
+        { book_id: '100004', title: 'こころ', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+        { book_id: '100005', title: '銀河鉄道の夜', author: '宮沢 賢治', publisher: '角川文庫', call_number: '913.6/ミ' },
+        { book_id: '100006', title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング', publisher: '静山社', call_number: '933/ロ' }
+      ];
+
+      renderPickerResultItems(samples);
+    }
+
+    /**
+     * ピッカー用蔵書検索
+     */
+    function searchBooksForPicker(query) {
+      if (!pickerResults) return;
+      if (!query) {
+        renderSampleSearchResults();
+        return;
+      }
+
+      pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">蔵書台帳を検索中...</div>';
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.status === 'success' && res.data && res.data.length > 0) {
+              renderPickerResultItems(res.data);
+            } else {
+              pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
+            }
+          })
+          .withFailureHandler((err) => {
+            pickerResults.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--shelf-danger); font-size: 0.82rem;">検索エラー: ${escapeHtml(err.message)}</div>`;
+          })
+          .apiDispatcher('apiSearchBooks', [query, {}]);
+      } else {
+        // スタンドアロン/ローカルテスト
+        const samples = [
+          { book_id: '100002', title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+          { book_id: '100001', title: '吾輩は猫である', author: '夏目 漱石', publisher: '岩波文庫', call_number: '913.6/ナ' },
+          { book_id: '100004', title: 'こころ', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+          { book_id: '100005', title: '銀河鉄道の夜', author: '宮沢 賢治', publisher: '角川文庫', call_number: '913.6/ミ' },
+          { book_id: '100006', title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング', publisher: '静山社', call_number: '933/ロ' }
+        ];
+        const filtered = samples.filter(b => b.title.includes(query) || b.author.includes(query) || b.book_id.includes(query));
+        renderPickerResultItems(filtered);
+      }
+    }
+
+    function renderPickerResultItems(books) {
+      if (!books || books.length === 0) {
+        pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
+        return;
+      }
+
+      pickerResults.innerHTML = books.map(b => `
+        <div class="shelf-picker-item" data-id="${escapeHtml(b.book_id)}" data-title="${escapeHtml(b.title)}" data-author="${escapeHtml(b.author || '')}" data-callnum="${escapeHtml(b.call_number || '')}">
+          <div>
+            <div class="shelf-picker-item-title">${escapeHtml(b.title)}</div>
+            <div class="shelf-picker-item-sub">
+              著者: ${escapeHtml(b.author || '不明')} | 出版社: ${escapeHtml(b.publisher || '---')} | 分類: ${escapeHtml(b.call_number || '---')}
+            </div>
+          </div>
+          <button type="button" class="shelf-btn-secondary" style="padding: 4px 10px; font-size: 0.78rem; border-color: rgba(245, 158, 11, 0.4); color: #fde68a;">
+            🎯 選択
+          </button>
+        </div>
+      `).join('');
+
+      pickerResults.querySelectorAll('.shelf-picker-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const id = item.getAttribute('data-id');
+          const title = item.getAttribute('data-title');
+          const author = item.getAttribute('data-author');
+          const callnum = item.getAttribute('data-callnum');
+          setTargetBook({ id, title, author, callNumber: callnum });
+          bookPickerModal.style.display = 'none';
+          showShelfToast(`🎯 探す本を『${title}』に設定しました`, 'info');
+        });
+      });
+    }
+
+    /**
+     * Google APIから現在アクティブな最新モデル一覧を同期
+     */
+    function syncActiveModelsFromGoogle() {
+      const apiKey = (apiKeyInput.value || '').trim();
+      if (!apiKey) {
+        showShelfToast('最新モデルの同期にはGemini APIキーの入力が必要です', 'warning');
+        return;
+      }
+
+      syncModelsBtn.disabled = true;
+      syncModelsBtn.innerHTML = '⏳ <span>同期中...</span>';
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            syncModelsBtn.disabled = false;
+            syncModelsBtn.innerHTML = '🔄 <span>Googleから最新同期</span>';
+
+            if (res && res.status === 'success' && res.data && res.data.activeModels) {
+              const models = res.data.activeModels;
+              const currentVal = modelSelect.value;
+              modelSelect.innerHTML = models.map(m => {
+                const label = m.id.includes('3.8') ? `🚀 ${m.name || m.id} (最新・最高性能・推奨)` : (m.id.includes('3.5') ? `⚡ ${m.name || m.id} (長期安定版)` : `🔹 ${m.name || m.id}`);
+                return `<option value="${escapeHtml(m.id)}">${escapeHtml(label)}</option>`;
+              }).join('');
+
+              if (models.some(m => m.id === currentVal)) {
+                modelSelect.value = currentVal;
+              } else if (res.data.latestFlash) {
+                modelSelect.value = res.data.latestFlash;
+              }
+              showShelfToast(`Googleから最新モデル一覧 (${models.length}件) を同期しました！`, 'success');
+            } else {
+              showShelfToast(res?.message || 'モデル一覧の取得に失敗しました', 'danger');
+            }
+          })
+          .withFailureHandler((err) => {
+            syncModelsBtn.disabled = false;
+            syncModelsBtn.innerHTML = '🔄 <span>Googleから最新同期</span>';
+            showShelfToast('同期エラー: ' + err.message, 'danger');
+          })
+          .apiDispatcher('apiGetActiveGeminiModels', [apiKey]);
+      } else {
+        setTimeout(() => {
+          syncModelsBtn.disabled = false;
+          syncModelsBtn.innerHTML = '🔄 <span>Googleから最新同期</span>';
+          showShelfToast('Googleから最新モデル一覧（gemini-3.8-flash等 3件）を同期しました (テスト)', 'success');
+        }, 500);
+      }
+    }
+
+    /**
+     * 点検履歴の取得と表示
+     */
+    function openLogsModal() {
+      if (!logsModal) return;
+      logsModal.style.display = 'flex';
+      logsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--shelf-text-muted);">読み込み中...</td></tr>';
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.status === 'success') {
+              renderLogsTable(res.data);
+            } else {
+              logsTableBody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--shelf-danger);">${escapeHtml(res?.message || '取得に失敗しました')}</td></tr>`;
+            }
+          })
+          .withFailureHandler((err) => {
+            logsTableBody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--shelf-danger);">通信エラー: ${escapeHtml(err.message)}</td></tr>`;
+          })
+          .apiDispatcher('apiGetShelfInventoryLogs', [30]);
+      } else {
+        setTimeout(() => {
+          renderLogsTable([
+            { timestamp: '2026/09/26 15:30:00', shelf_id: 'A-1', total_count: 6, normal_count: 5, misplaced_count: 1, operator: '司書 (テスト)' },
+            { timestamp: '2026/09/25 10:15:20', shelf_id: 'B-1', total_count: 12, normal_count: 12, misplaced_count: 0, operator: '図書委員' },
+            { timestamp: '2026/09/24 16:40:05', shelf_id: 'A-2', total_count: 8, normal_count: 7, misplaced_count: 1, operator: '司書 (テスト)' }
+          ]);
+        }, 300);
+      }
+    }
+
+    function renderLogsTable(logs) {
+      if (!logs || logs.length === 0) {
+        logsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--shelf-text-muted);">まだ点検ログがありません</td></tr>';
+        return;
+      }
+
+      logsTableBody.innerHTML = logs.map(log => {
+        const hasMisplaced = Number(log.misplaced_count || 0) > 0;
+        return `
+          <tr style="border-bottom: 1px solid var(--shelf-border); transition: background 0.2s;">
+            <td style="padding: 10px; color: var(--shelf-text-muted); font-size: 0.75rem;">${escapeHtml(log.timestamp)}</td>
+            <td style="padding: 10px; font-weight: 700; color: #fff;">${escapeHtml(log.shelf_id)}</td>
+            <td style="padding: 10px; font-weight: 700;">${escapeHtml(log.total_count)}</td>
+            <td style="padding: 10px; color: var(--shelf-success); font-weight: 700;">${escapeHtml(log.normal_count)}</td>
+            <td style="padding: 10px; color: ${hasMisplaced ? 'var(--shelf-danger)' : 'var(--shelf-text-muted)'}; font-weight: 700;">
+              ${hasMisplaced ? `⚠️ ${escapeHtml(log.misplaced_count)}` : '0'}
+            </td>
+            <td style="padding: 10px; color: var(--shelf-text-muted); font-size: 0.75rem;">${escapeHtml(log.operator || '---')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /**
+     * 現在フレームの撮影とAI解析開始
+     */
+    function captureAndAnalyze() {
+      if (!video || !video.videoWidth) {
+        // カメラ映像がない場合のフォールバック（PCやテスト環境用シミュレーション本棚描画）
+        canvas.width = 1280;
+        canvas.height = 720;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 上段の棚板ライン
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(40, 360, 1200, 14);
+        // 下段の棚板ライン
+        ctx.fillRect(40, 700, 1200, 14);
+        lastCapturedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      } else {
+        // 実カメラ映像からCanvasに描画
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        lastCapturedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      }
+
+      // 画面表示をカメラから静止画へ切り替え
+      video.style.display = 'none';
+      canvas.style.display = 'block';
+      if (guideOverlay) guideOverlay.style.display = 'none';
+      shutterBtn.style.display = 'none';
+      retakeBtn.style.display = 'flex';
+
+      // ストリーム一時停止
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+
+      // AI解析リクエスト
+      sendImageToAI(lastCapturedBase64);
+    }
+
+    /**
+     * ファイルアップロード処理
+     */
+    function handleFileUpload(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          lastCapturedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          video.style.display = 'none';
+          canvas.style.display = 'block';
+          if (guideOverlay) guideOverlay.style.display = 'none';
+          shutterBtn.style.display = 'none';
+          retakeBtn.style.display = 'flex';
+
+          sendImageToAI(lastCapturedBase64);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /**
+     * GASバックエンドへ画像送信 & 解析
+     */
+    function sendImageToAI(imageBase64) {
+      const isFind = currentMode === 'find';
+      const promptDesc = isFind
+        ? `探している本『${targetBook.title}』を背表紙AIが画像から探索中...\n(文字認識・照合・ターゲッティング)`
+        : '本棚の背表紙をAIが解析中...\n(文字認識・台帳照合・乱架判定)';
+      showLoading(promptDesc);
+
+      const apiKey = localStorage.getItem('shelf_gemini_api_key') || '';
+      const selectedModel = localStorage.getItem('shelf_gemini_model') || 'gemini-3.8-flash';
+      const options = {
+        shelfId: currentShelfId,
+        apiKey: apiKey,
+        model: selectedModel,
+        useMock: !apiKey,
+        mode: currentMode,
+        targetBookId: isFind ? targetBook.id : null,
+        targetTitle: isFind ? targetBook.title : null
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            hideLoading();
+            if (res && res.status === 'success') {
+              handleAnalysisSuccess(res.data);
+            } else {
+              showShelfToast(res?.message || '解析に失敗しました', 'danger');
+            }
+          })
+          .withFailureHandler((err) => {
+            hideLoading();
+            showShelfToast('サーバー通信エラー: ' + err.message, 'danger');
+          })
+          .apiDispatcher('apiAnalyzeShelfSpines', [imageBase64, options]);
+      } else {
+        // スタンドアロン/外部ホスティング (GitHub Pages)
+        const endpoint = 'https://script.google.com/macros/s/AKfycbyIaNK50vKYhZplhUU__0bxp9JP1be9mZOXSZyvk00/exec';
+
+        // APIキー未指定時またはモック優先時は即座にローカル模擬データで応答
+        if (options.useMock) {
+          setTimeout(() => {
+            hideLoading();
+            const mockResult = generateClientMockData(currentShelfId, options);
+            handleAnalysisSuccess(mockResult);
+          }, 900);
+          return;
+        }
+
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'apiAnalyzeShelfSpines', args: [imageBase64, options] })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTPエラー: ' + res.status);
+          return res.json();
+        })
+        .then(res => {
+          hideLoading();
+          if (res && res.status === 'success') {
+            handleAnalysisSuccess(res.data);
+          } else {
+            showShelfToast(res?.message || '解析に失敗しました', 'danger');
+          }
+        })
+        .catch(err => {
+          console.warn('[Shelf AI] Fetch error, falling back to mock:', err);
+          hideLoading();
+          const mockResult = generateClientMockData(currentShelfId, options);
+          handleAnalysisSuccess(mockResult);
+        });
+      }
+    }
+
+    /**
+     * 解析結果のUI反映
+     */
+    function handleAnalysisSuccess(data) {
+      lastAnalysisResult = data;
+
+      if (currentMode === 'find') {
+        // === AR本探しモードの処理 ===
+        handleFindModeResults(data);
+      } else {
+        // === 蔵書点検モードの処理 ===
+        handleInventoryModeResults(data);
+      }
+
+      renderBoundingBoxes(data.spines, data);
+      renderBooksTrack(data.spines);
+    }
+
+    /**
+     * AR本探しモード 結果処理
+     */
+    /**
+     * AR本探しモード 結果処理（何段目の何番目に対応）
+     */
+    function handleFindModeResults(data) {
+      if (data.target_found) {
+        const spineIdx = data.target_spine_index;
+        const totalTiers = Number(data.target_total_tiers || 1);
+        const tier = Number(data.target_shelf_tier || 1);
+        const col = Number(data.target_order_in_tier || (spineIdx + 1));
+        const hasMultiTiers = totalTiers > 1;
+
+        const tierDetail = hasMultiTiers ? `上から <strong>${tier}段目</strong> の ` : '';
+        const posText = `${tierDetail}<strong>左から ${col}番目</strong> の本です`;
+
+        if (targetFoundBanner) {
+          targetFoundText.innerHTML = `見つかりました！ ${posText}`;
+          targetFoundBanner.style.display = 'flex';
+        }
+        if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+
+        updateFindSummary(true, spineIdx, tier, col, totalTiers, data.total_count, '🎉 発見しました！');
+        playSuccessChime();
+
+        const toastPos = hasMultiTiers ? `上から${tier}段目・左から${col}番目` : `左から${col}番目`;
+        showShelfToast(`🎉 探していた本が見つかりました！金色に光る枠（${toastPos}）を確認してください。`, 'success');
+      } else {
+        if (targetFoundBanner) targetFoundBanner.style.display = 'none';
+        if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'flex';
+
+        updateFindSummary(false, -1, 1, -1, 1, data.total_count, '🔍 見当たりません');
+        showShelfToast('🔍 この画角内には見当たりませんでした。棚の上下や左右を写してみてください。', 'info');
+      }
+    }
+
+    /**
+     * 蔵書点検モード 結果処理
+     */
+    function handleInventoryModeResults(data) {
+      renderSummaryCards(data);
+      confirmBtn.disabled = false;
+
+      if (targetFoundBanner) targetFoundBanner.style.display = 'none';
+      if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+
+      if (data.misplaced_count > 0) {
+        showShelfToast(`⚠️ 乱架（並び順違い）が ${data.misplaced_count} 冊見つかりました！赤枠を確認してください。`, 'danger');
+      } else {
+        showShelfToast(`✅ 全 ${data.total_count} 冊の並び順が確認されました。正常です！`, 'success');
+      }
+    }
+
+    /**
+     * AR本探し サマリー更新（何段目の何番目）
+     */
+    function updateFindSummary(found, spineIndex, tier, col, totalTiers, totalCount, statusText) {
+      if (!findSummary) return;
+
+      if (findStatusPill) {
+        findStatusPill.className = `shelf-find-status-pill ${found ? 'found' : 'searching'}`;
+        findStatusPill.innerHTML = found ? `<span>✨</span> <span>${statusText}</span>` : `<span>📷</span> <span>${statusText}</span>`;
+      }
+
+      if (findPositionVal) {
+        if (found) {
+          if (totalTiers > 1) {
+            findPositionVal.innerHTML = `上から <strong style="font-size: 1.3rem; color: #facc15;">${tier}</strong> 段目 の 左から <strong style="font-size: 1.3rem; color: #facc15;">${col}</strong> 番目`;
+          } else {
+            findPositionVal.innerHTML = `左から <strong style="font-size: 1.3rem; color: #facc15;">${col}</strong> 番目`;
+          }
+        } else {
+          findPositionVal.innerHTML = totalCount > 0 ? '<span style="font-size: 0.9rem; color: var(--shelf-text-muted);">この段には無し</span>' : '---';
+        }
+      }
+
+      if (findCountVal) {
+        findCountVal.textContent = `${totalCount || 0} 冊検出 ${totalTiers > 1 ? `(${totalTiers}段)` : ''}`;
+      }
+    }
+
+    /**
+     * 蔵書点検 サマリーカード描画
+     */
+    function renderSummaryCards(data) {
+      document.getElementById('stat-total-count').textContent = data.total_count || 0;
+      document.getElementById('stat-normal-count').textContent = data.normal_count || 0;
+      document.getElementById('stat-misplaced-count').textContent = data.misplaced_count || 0;
+      document.getElementById('stat-unknown-count').textContent = data.unknown_count || 0;
+    }
+
+    /**
+     * 背表紙バウンディングボックスの描画 (ARスマートターゲッティング & スポットライト)
+     */
+    function renderBoundingBoxes(spines, fullData) {
+      bboxLayer.innerHTML = '';
+      bboxLayer.style.display = 'block';
+
+      if (!spines || spines.length === 0) return;
+
+      const isFindMode = currentMode === 'find';
+      const isTargetFound = isFindMode && fullData && fullData.target_found;
+      const totalTiers = Number(fullData?.target_total_tiers || 1);
+
+      spines.forEach((spine, idx) => {
+        const box = spine.box_2d || [100, 100, 900, 200];
+        const [ymin, xmin, ymax, xmax] = box;
+
+        const topPct = (ymin / 10).toFixed(2);
+        const leftPct = (xmin / 10).toFixed(2);
+        const widthPct = ((xmax - xmin) / 10).toFixed(2);
+        const heightPct = ((ymax - ymin) / 10).toFixed(2);
+
+        const el = document.createElement('div');
+        const isTarget = isFindMode && (spine.is_target || spine.status_tag === 'TARGET');
+
+        // クラス設定
+        if (isFindMode) {
+          if (isTarget) {
+            el.className = 'shelf-bbox target';
+          } else if (isTargetFound) {
+            // 他の本は減光（スポットライト効果）
+            el.className = 'shelf-bbox dimmed';
+          } else {
+            el.className = `shelf-bbox ${spine.status_tag.toLowerCase()}`;
+          }
+        } else {
+          el.className = `shelf-bbox ${spine.status_tag.toLowerCase()}`;
+        }
+
+        el.style.top = `${topPct}%`;
+        el.style.left = `${leftPct}%`;
+        el.style.width = `${widthPct}%`;
+        el.style.height = `${heightPct}%`;
+        el.setAttribute('data-index', idx);
+
+        // バッジ / ピン要素
+        if (isTarget) {
+          const tier = Number(spine.shelf_tier || fullData?.target_shelf_tier || 1);
+          const col = Number(spine.order_in_tier || fullData?.target_order_in_tier || (idx + 1));
+          const pinText = totalTiers > 1 ? `これです！ (${tier}段目-${col}番)` : `これです！ (${col}番)`;
+
+          // ターゲット本の指差しピン
+          const pin = document.createElement('div');
+          pin.className = 'shelf-target-pin';
+          pin.innerHTML = `<span class="shelf-pin-arrow">👇</span><span class="shelf-pin-text">${pinText}</span>`;
+          el.appendChild(pin);
+
+          el.innerHTML += `
+            <div class="shelf-bbox-tag">
+              ✨ ここにあります！ (${totalTiers > 1 ? `${tier}段目-` : ''}#${col})
+            </div>
+          `;
+        } else {
+          const tierLabel = spine.shelf_tier && totalTiers > 1 ? `${spine.shelf_tier}段-` : '';
+          el.innerHTML = `
+            <div class="shelf-bbox-tag">
+              ${spine.is_misplaced ? '⚠️ 乱架' : `${tierLabel}#${spine.order_in_tier || spine.order}`}
+            </div>
+          `;
+        }
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectSpine(idx);
+        });
+
+        bboxLayer.appendChild(el);
+      });
+    }
+
+    /**
+     * 下部書籍リスト（カルーセル）描画
+     */
+    function renderBooksTrack(spines) {
+      booksTrack.innerHTML = '';
+      if (!spines || spines.length === 0) {
+        booksTrack.innerHTML = '<div style="color: var(--shelf-text-muted); font-size: 0.85rem; padding: 8px;">検出された書籍がありません</div>';
+        return;
+      }
+
+      const isFindMode = currentMode === 'find';
+
+      spines.forEach((spine, idx) => {
+        const card = document.createElement('div');
+        const isTarget = isFindMode && (spine.is_target || spine.status_tag === 'TARGET');
+
+        let cardClass = 'shelf-book-card';
+        if (isTarget) cardClass += ' is-target';
+        else if (spine.is_misplaced) cardClass += ' is-misplaced';
+
+        card.className = cardClass;
+        card.setAttribute('data-index', idx);
+
+        let badgeClass = 'normal';
+        let badgeLabel = `正常 (#${spine.order})`;
+
+        if (isTarget) {
+          badgeClass = 'target';
+          badgeLabel = `🎯 探していた本 (#${spine.order})`;
+        } else if (spine.is_misplaced) {
+          badgeClass = 'misplaced';
+          badgeLabel = `⚠️ 乱架(並び違い) (#${spine.order})`;
+        } else if (!spine.is_registered) {
+          badgeClass = 'warning';
+          badgeLabel = `未登録 (#${spine.order})`;
+        }
+
+        card.innerHTML = `
+          <div class="shelf-card-badge ${badgeClass}">${badgeLabel}</div>
+          <div class="shelf-card-title">${escapeHtml(spine.title || 'タイトル不明')}</div>
+          <div class="shelf-card-meta">著者: ${escapeHtml(spine.author || '不明')}</div>
+          <div class="shelf-card-meta">分類: <strong>${escapeHtml(spine.call_number || '---')}</strong></div>
+          ${spine.misplaced_reason ? `<div style="font-size: 0.7rem; color: var(--shelf-danger); margin-top: 4px; font-weight: 600;">${escapeHtml(spine.misplaced_reason)}</div>` : ''}
+        `;
+
+        card.addEventListener('click', () => selectSpine(idx));
+        booksTrack.appendChild(card);
+
+        // ターゲット本なら自動的にセンターにスクロール
+        if (isTarget) {
+          setTimeout(() => {
+            card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          }, 200);
+        }
+      });
+    }
+
+    /**
+     * 背表紙選択時の連動ハイライト
+     */
+    function selectSpine(idx) {
+      selectedSpineIndex = idx;
+
+      // ボックスのアクティブ
+      document.querySelectorAll('.shelf-bbox').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-index') === String(idx));
+      });
+
+      // カードのアクティブ & スクロール
+      document.querySelectorAll('.shelf-book-card').forEach(el => {
+        const isTarget = el.getAttribute('data-index') === String(idx);
+        el.classList.toggle('active', isTarget);
+        if (isTarget) {
+          el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      });
+    }
+
+    /**
+     * 点検確定の保存
+     */
+    function saveInventory() {
+      if (!lastAnalysisResult) return;
+
+      showLoading('点検台帳に保存中...');
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            hideLoading();
+            if (res && res.status === 'success') {
+              showShelfToast(res.data.message || '点検データを保存しました！', 'success');
+              confirmBtn.disabled = true;
+            } else {
+              showShelfToast(res?.message || '保存に失敗しました', 'danger');
+            }
+          })
+          .withFailureHandler((err) => {
+            hideLoading();
+            showShelfToast('保存エラー: ' + err.message, 'danger');
+          })
+          .apiDispatcher('apiSaveShelfInventoryLog', [currentShelfId, lastAnalysisResult]);
+      } else {
+        setTimeout(() => {
+          hideLoading();
+          showShelfToast(`棚【${currentShelfId}】の点検結果を保存しました！（ローカルテスト）`, 'success');
+          confirmBtn.disabled = true;
+        }, 600);
+      }
+    }
+
+    function clearResults() {
+      lastCapturedBase64 = null;
+      lastAnalysisResult = null;
+      selectedSpineIndex = null;
+      bboxLayer.innerHTML = '';
+      booksTrack.innerHTML = '';
+      const emptyHint = document.getElementById('shelf-books-empty-hint');
+      if (emptyHint) emptyHint.style.display = 'block';
+
+      if (document.getElementById('stat-total-count')) document.getElementById('stat-total-count').textContent = '0';
+      if (document.getElementById('stat-normal-count')) document.getElementById('stat-normal-count').textContent = '0';
+      if (document.getElementById('stat-misplaced-count')) document.getElementById('stat-misplaced-count').textContent = '0';
+      if (document.getElementById('stat-unknown-count')) document.getElementById('stat-unknown-count').textContent = '0';
+
+      if (confirmBtn) confirmBtn.disabled = true;
+    }
+
+    function showLoading(msg) {
+      if (loadingText) loadingText.textContent = msg;
+      if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+    }
+
+    function showShelfToast(msg, type = 'info') {
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'danger' ? '#f43f5e' : (type === 'success' ? '#10b981' : (type === 'warning' ? '#f59e0b' : '#06b6d4'))};
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        z-index: 200;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        max-width: 90%;
+        text-align: center;
+      `;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+
+      setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(-50%) translateY(-8px)'; }, 10);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3800);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * スタンドアロン/ローカルテスト用モックデータ生成 (探索ターゲット判定を含む)
+     */
+    function generateClientMockData(shelfId, options) {
+      options = options || {};
+      const isFindMode = options.mode === 'find';
+      const targetTitle = options.targetTitle ? String(options.targetTitle).replace(/\s+/g, '').toLowerCase() : '';
+      const targetId = options.targetBookId ? String(options.targetBookId).trim() : '';
+
+      // 2段構造のリアルな模擬データ（上段3冊、下段3冊）
+      const sampleSpines = [
+        // 上段 (1段目)
+        { tier: 1, col: 1, title: '吾輩は猫である', author: '夏目 漱石', publisher: '岩波文庫', call_number: '913.6/ナ', mock_id: '100001', box_2d: [70, 70, 470, 320] },
+        { tier: 1, col: 2, title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ', mock_id: '100002', box_2d: [70, 370, 470, 620] },
+        { tier: 1, col: 3, title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ', mock_id: '100003', box_2d: [70, 670, 470, 920] },
+        // 下段 (2段目)
+        { tier: 2, col: 1, title: 'こころ', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ', mock_id: '100004', box_2d: [530, 70, 930, 320] },
+        { tier: 2, col: 2, title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング', publisher: '静山社', call_number: '933/ロ', mock_id: '100006', box_2d: [530, 370, 930, 620] },
+        { tier: 2, col: 3, title: '銀河鉄道の夜', author: '宮沢 賢治', publisher: '角川文庫', call_number: '913.6/ミ', mock_id: '100005', box_2d: [530, 670, 930, 920] }
+      ];
+
+      let targetFound = false;
+      let targetIndex = -1;
+      let targetTier = 1;
+      let targetCol = 1;
+
+      const spines = sampleSpines.map((b, idx) => {
+        let isTarget = false;
+        if (isFindMode) {
+          const bTitle = b.title.replace(/\s+/g, '').toLowerCase();
+          if ((targetId && b.mock_id === targetId) || (targetTitle && (bTitle.includes(targetTitle) || targetTitle.includes(bTitle)))) {
+            isTarget = true;
+            targetFound = true;
+            if (targetIndex === -1) {
+              targetIndex = idx;
+              targetTier = b.tier;
+              targetCol = b.col;
+            }
+          }
+        }
+
+        const isMisplaced = !isFindMode && b.mock_id === '100006';
+
+        return {
+          order: idx + 1,
+          shelf_tier: b.tier,
+          order_in_tier: b.col,
+          total_tiers: 2,
+          title: b.title,
+          author: b.author,
+          publisher: b.publisher,
+          call_number: b.call_number,
+          box_2d: b.box_2d,
+          is_registered: true,
+          is_misplaced: isMisplaced,
+          is_target: isTarget,
+          status_tag: isTarget ? 'TARGET' : (isMisplaced ? 'MISPLACED' : 'NORMAL'),
+          misplaced_reason: isMisplaced ? '⚠️【乱架】日本文学(913)の棚に英米文学(933)が混入しています' : ''
+        };
+      });
+
+      return {
+        shelf_id: shelfId,
+        mode: isFindMode ? 'find' : 'inventory',
+        target_found: targetFound,
+        target_spine_index: targetIndex,
+        target_shelf_tier: targetTier,
+        target_order_in_tier: targetCol,
+        target_total_tiers: 2,
+        position_text: `上から${targetTier}段目の左から${targetCol}番目`,
+        total_count: spines.length,
+        normal_count: spines.filter(s => s.status_tag === 'NORMAL' || s.status_tag === 'TARGET').length,
+        misplaced_count: spines.filter(s => s.status_tag === 'MISPLACED').length,
+        unknown_count: 0,
+        spines: spines
+      };
+    }
+
+  })();
+</script>
+
+</body>
+</html>
