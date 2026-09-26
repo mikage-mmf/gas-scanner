@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
   :root {
     --shelf-bg: #0b0f19;
@@ -1070,6 +1071,9 @@
         <button type="button" class="shelf-btn-secondary" id="btn-open-book-picker" style="padding: 8px 14px; font-size: 0.85rem;">
           🔍 本を変更
         </button>
+        <button type="button" class="shelf-btn-secondary" id="btn-shelf-scan-isbn" style="padding: 8px 12px; font-size: 0.85rem; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 4px;" title="カメラで本のISBNバーコードをスキャンして探す本に設定">
+          📷 <span>ISBNスキャン</span>
+        </button>
         <button type="button" class="shelf-btn-secondary" id="btn-shelf-upload-find" style="padding: 8px 12px; font-size: 0.85rem;" title="写真を直接選んで探す">
           📁 写真
         </button>
@@ -1283,34 +1287,37 @@
         <button type="button" class="shelf-btn-secondary" id="btn-close-book-picker" style="padding: 4px 10px;">✕</button>
       </div>
       <p style="font-size: 0.8rem; color: var(--shelf-text-muted);">
-        探したい本のタイトル・著者名・蔵書IDを入力するか、下のサンプル候補から選んでください。
+        探したい本のタイトル・著者名・蔵書ID・ISBNを入力するか、バーコード読取または下の候補から選んでください。
       </p>
 
-      <!-- 検索入力バー -->
-      <div style="position: relative;">
-        <input type="text" id="shelf-picker-search-input" class="shelf-input" placeholder="書名・著者名・蔵書IDを入力して検索..." autofocus>
+      <!-- 検索入力バー & バーコード読取ボタン -->
+      <div style="position: relative; display: flex; gap: 8px;">
+        <input type="text" id="shelf-picker-search-input" class="shelf-input" placeholder="書名・著者名・蔵書ID・ISBNバーコードを入力/スキャン..." autofocus style="flex: 1;">
+        <button type="button" class="shelf-btn-secondary" id="btn-modal-scan-isbn" style="padding: 0 14px; font-size: 0.85rem; white-space: nowrap; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 6px;" title="カメラで本のISBNバーコードをスキャン">
+          📷 <span>バーコード読取</span>
+        </button>
       </div>
 
       <!-- クイック候補チップ -->
       <div>
         <div style="font-size: 0.75rem; color: var(--shelf-text-muted); font-weight: 700; margin-bottom: 4px;">
-          ⚡ クイック選択候補（デモ・人気図書）:
+          ⚡ クイック選択候補（人気図書）:
         </div>
         <div class="shelf-chip-group" id="shelf-quick-chips">
           <button type="button" class="shelf-chip" data-title="坊っちゃん" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100002">
-            📖 坊っちゃん (上段)
+            📖 坊っちゃん
           </button>
           <button type="button" class="shelf-chip" data-title="吾輩は猫である" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100001">
-            🐱 吾輩は猫である (上段)
+            🐱 吾輩は猫である
           </button>
           <button type="button" class="shelf-chip" data-title="こころ" data-author="夏目 漱石" data-callnum="913.6/ナ" data-id="100004">
-            💭 こころ (下段)
+            💭 こころ
           </button>
           <button type="button" class="shelf-chip" data-title="銀河鉄道の夜" data-author="宮沢 賢治" data-callnum="913.6/ミ" data-id="100005">
-            🌌 銀河鉄道の夜 (下段)
+            🌌 銀河鉄道の夜
           </button>
           <button type="button" class="shelf-chip" data-title="ハリー・ポッターと賢者の石" data-author="J.K.ローリング" data-callnum="933/ロ" data-id="100006">
-            ⚡ ハリー・ポッター (下段)
+            ⚡ ハリー・ポッター
           </button>
         </div>
       </div>
@@ -1329,6 +1336,34 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
         <button type="button" class="shelf-btn-secondary" id="btn-cancel-book-picker">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ISBNバーコード読み取りモーダル（AR探す本の設定用） -->
+  <div class="shelf-modal-backdrop" id="shelf-barcode-modal" style="display: none;">
+    <div class="shelf-modal-card" style="max-width: 480px; text-align: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h3 style="font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>📷</span> <span>ISBNバーコードをスキャン</span>
+        </h3>
+        <button type="button" class="shelf-btn-secondary" id="btn-close-barcode-modal" style="padding: 4px 10px;">✕</button>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--shelf-text-muted); margin-bottom: 12px;">
+        探したい本の裏表紙にある「978...」ISBNバーコードをカメラ枠に合わせてください。
+      </p>
+
+      <!-- スキャナー領域 -->
+      <div style="position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; min-height: 240px; display: flex; align-items: center; justify-content: center;">
+        <div id="shelf-barcode-reader" style="width: 100%;"></div>
+      </div>
+
+      <div id="shelf-barcode-status" style="margin-top: 10px; font-size: 0.85rem; color: #38bdf8; font-weight: 700;">
+        バーコードを認識待機中...
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+        <button type="button" class="shelf-btn-secondary" id="btn-cancel-barcode-modal">キャンセル</button>
       </div>
     </div>
   </div>
@@ -1419,6 +1454,17 @@
     const pickerSearchInput = document.getElementById('shelf-picker-search-input');
     const pickerResults = document.getElementById('shelf-picker-results');
     const quickChips = document.getElementById('shelf-quick-chips');
+
+    // DOM要素: ISBNバーコードスキャンモーダル & ボタン
+    const btnShelfScanIsbn = document.getElementById('btn-shelf-scan-isbn');
+    const btnModalScanIsbn = document.getElementById('btn-modal-scan-isbn');
+    const barcodeModal = document.getElementById('shelf-barcode-modal');
+    const closeBarcodeModalBtn = document.getElementById('btn-close-barcode-modal');
+    const cancelBarcodeModalBtn = document.getElementById('btn-cancel-barcode-modal');
+    const barcodeStatusEl = document.getElementById('shelf-barcode-status');
+
+    let html5QrScanner = null;
+    let isBarcodeScanning = false;
 
     // 初期化
     window.addEventListener('DOMContentLoaded', () => {
@@ -1655,6 +1701,37 @@
     }
 
     /**
+     * 単音ビープ音再生
+     */
+    function playBeep(freq = 1760, duration = 0.12) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    /**
+     * カメラ停止
+     */
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+    }
+
+    /**
      * カメラ起動 (背面カメラ優先)
      */
     async function startCamera() {
@@ -1765,6 +1842,31 @@
           const q = (e.target.value || '').trim();
           searchDebounceTimer = setTimeout(() => searchBooksForPicker(q), 300);
         });
+
+        // 物理バーコードリーダーおよびEnterキー確定
+        pickerSearchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = pickerSearchInput.value.trim();
+            if (val) {
+              resolveIsbnAndSetTarget(val);
+            }
+          }
+        });
+      }
+
+      // ISBNバーコードスキャン起動ボタン
+      if (btnShelfScanIsbn) {
+        btnShelfScanIsbn.addEventListener('click', startIsbnScanner);
+      }
+      if (btnModalScanIsbn) {
+        btnModalScanIsbn.addEventListener('click', startIsbnScanner);
+      }
+      if (closeBarcodeModalBtn) {
+        closeBarcodeModalBtn.addEventListener('click', stopIsbnScanner);
+      }
+      if (cancelBarcodeModalBtn) {
+        cancelBarcodeModalBtn.addEventListener('click', stopIsbnScanner);
       }
 
       // 点検履歴モーダル
@@ -1827,9 +1929,9 @@
     }
 
     /**
-     * ピッカー用蔵書検索
+     * ピッカー用蔵書検索 (API照合 + openBD外部ISBN照合)
      */
-    function searchBooksForPicker(query) {
+    async function searchBooksForPicker(query) {
       if (!pickerResults) return;
       if (!query) {
         renderSampleSearchResults();
@@ -1838,31 +1940,234 @@
 
       pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">蔵書台帳を検索中...</div>';
 
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler((res) => {
-            if (res && res.status === 'success' && res.data && res.data.length > 0) {
-              renderPickerResultItems(res.data);
-            } else {
-              pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
-            }
-          })
-          .withFailureHandler((err) => {
-            pickerResults.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--shelf-danger); font-size: 0.82rem;">検索エラー: ${escapeHtml(err.message)}</div>`;
-          })
-          .apiDispatcher('apiSearchBooks', [query, {}]);
-      } else {
-        // スタンドアロン/ローカルテスト
-        const samples = [
-          { book_id: '100002', title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
-          { book_id: '100001', title: '吾輩は猫である', author: '夏目 漱石', publisher: '岩波文庫', call_number: '913.6/ナ' },
-          { book_id: '100004', title: 'こころ', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
-          { book_id: '100005', title: '銀河鉄道の夜', author: '宮沢 賢治', publisher: '角川文庫', call_number: '913.6/ミ' },
-          { book_id: '100006', title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング', publisher: '静山社', call_number: '933/ロ' }
-        ];
-        const filtered = samples.filter(b => b.title.includes(query) || b.author.includes(query) || b.book_id.includes(query));
-        renderPickerResultItems(filtered);
+      try {
+        const res = await callSearchBooksApi(query);
+        if (res && res.status === 'success' && res.data && res.data.length > 0) {
+          renderPickerResultItems(res.data);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Shelf Search] API search failed, checking ISBN:', err);
       }
+
+      // ISBN（978...または10桁）の場合は openBD による書誌検索を試行
+      const cleanIsbn = query.replace(/[-\s]/g, '');
+      const isIsbn = /^(978|979)\d{10}$/.test(cleanIsbn) || /^\d{9}[\dX]$/.test(cleanIsbn);
+      if (isIsbn) {
+        try {
+          const openBdRes = await fetch(`https://api.openbd.jp/v1/get?isbn=${cleanIsbn}`).then(r => r.json());
+          if (openBdRes && openBdRes[0] && openBdRes[0].summary) {
+            const s = openBdRes[0].summary;
+            renderPickerResultItems([{
+              book_id: cleanIsbn,
+              title: s.title,
+              author: s.author,
+              publisher: s.publisher,
+              call_number: 'ISBN'
+            }]);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // サンプル候補からのローカルフィルタリング
+      const samples = [
+        { book_id: '100002', title: '坊っちゃん', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+        { book_id: '100001', title: '吾輩は猫である', author: '夏目 漱石', publisher: '岩波文庫', call_number: '913.6/ナ' },
+        { book_id: '100004', title: 'こころ', author: '夏目 漱石', publisher: '新潮文庫', call_number: '913.6/ナ' },
+        { book_id: '100005', title: '銀河鉄道の夜', author: '宮沢 賢治', publisher: '角川文庫', call_number: '913.6/ミ' },
+        { book_id: '100006', title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング', publisher: '静山社', call_number: '933/ロ' }
+      ];
+      const filtered = samples.filter(b => b.title.includes(query) || b.author.includes(query) || b.book_id.includes(query));
+      if (filtered.length > 0) {
+        renderPickerResultItems(filtered);
+      } else {
+        pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
+      }
+    }
+
+    /**
+     * 蔵書検索APIの共通呼び出し
+     */
+    function callSearchBooksApi(query) {
+      return new Promise((resolve, reject) => {
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(res => resolve(res))
+            .withFailureHandler(err => reject(err))
+            .apiDispatcher('apiSearchBooks', [query, {}]);
+        } else {
+          const endpoint = 'https://script.google.com/macros/s/AKfycbyIaNK50vKYhZplhUU__0bxp9JP1be9mZOXSZyvk00/exec';
+          fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'apiSearchBooks', args: [query, {}] })
+          })
+          .then(res => res.json())
+          .then(res => resolve(res))
+          .catch(err => reject(err));
+        }
+      });
+    }
+
+    /**
+     * ISBNバーコードスキャンを開始（Html5Qrcodeを使用）
+     */
+    async function startIsbnScanner() {
+      if (barcodeModal) barcodeModal.style.display = 'flex';
+      if (barcodeStatusEl) barcodeStatusEl.textContent = 'カメラ起動中...';
+
+      // メインカメラのストリームを一時停止してカメラを解放
+      stopCamera();
+
+      if (typeof Html5Qrcode === 'undefined') {
+        if (barcodeStatusEl) barcodeStatusEl.textContent = 'スキャナーライブラリを読込中...';
+        return;
+      }
+
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+          html5QrScanner.clear();
+        } catch (e) {}
+      }
+
+      try {
+        html5QrScanner = new Html5Qrcode('shelf-barcode-reader');
+        const config = {
+          fps: 15,
+          qrbox: { width: 280, height: 150 },
+          aspectRatio: 1.333333
+        };
+
+        await html5QrScanner.start(
+          { facingMode: 'environment' },
+          config,
+          onIsbnBarcodeScanned,
+          () => {}
+        );
+        isBarcodeScanning = true;
+        if (barcodeStatusEl) {
+          barcodeStatusEl.textContent = 'ISBNバーコード（978...）を枠に合わせてください';
+        }
+      } catch (err) {
+        console.warn('[Barcode Scanner] 起動エラー:', err);
+        if (barcodeStatusEl) {
+          barcodeStatusEl.textContent = 'カメラ起動エラー: ' + (err.message || 'アクセス権限がありません');
+        }
+      }
+    }
+
+    /**
+     * ISBNバーコードスキャンを終了
+     */
+    async function stopIsbnScanner() {
+      isBarcodeScanning = false;
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+          html5QrScanner.clear();
+        } catch (e) {}
+        html5QrScanner = null;
+      }
+      if (barcodeModal) barcodeModal.style.display = 'none';
+
+      // メインの本棚カメラを再開
+      startCamera();
+    }
+
+    /**
+     * ISBNバーコード検出時ハンドラ
+     */
+    function onIsbnBarcodeScanned(decodedText) {
+      if (!decodedText || !isBarcodeScanning) return;
+      let raw = String(decodedText).trim();
+      let code = raw.replace(/[-\s]/g, '').toUpperCase();
+
+      // 【上下2段バーコードのCコード(192...)誤読防止】
+      if (/^192\d{10}$/.test(code)) {
+        playBeep(330, 0.25);
+        if (barcodeStatusEl) {
+          barcodeStatusEl.textContent = '⚠️ 下段の書籍コード(192)です。上の段(978...)を枠に合わせてください';
+        }
+        return;
+      }
+
+      // NW-7/CODE39枠文字除去（図書シール対応）
+      const nw7Match = code.match(/^[A-Da-d](\d{4,12})[A-Da-d]$/);
+      if (nw7Match) {
+        code = nw7Match[1];
+      }
+
+      // 読取成功
+      playBeep(1760, 0.12);
+      stopIsbnScanner();
+      resolveIsbnAndSetTarget(code);
+    }
+
+    /**
+     * バーコード/ISBNコードから本を特定してターゲットに設定
+     */
+    async function resolveIsbnAndSetTarget(code) {
+      showShelfToast(`🔍 バーコード「${code}」を照合中...`, 'info');
+
+      // 1. ローカル台帳 / サーバー側蔵書検索
+      let bookFound = null;
+      try {
+        const res = await callSearchBooksApi(code);
+        if (res && res.status === 'success' && res.data && res.data.length > 0) {
+          bookFound = res.data[0];
+        }
+      } catch (e) {
+        console.warn('[resolveIsbnAndSetTarget] Search error:', e);
+      }
+
+      if (bookFound) {
+        setTargetBook({
+          id: bookFound.book_id,
+          title: bookFound.title,
+          author: bookFound.author || '',
+          callNumber: bookFound.call_number || ''
+        });
+        playSuccessChime();
+        showShelfToast(`🎯 探す本を『${bookFound.title}』に設定しました！`, 'success');
+        if (bookPickerModal) bookPickerModal.style.display = 'none';
+        return;
+      }
+
+      // 2. ISBN（978/979または10桁）の場合は openBD から自動取得
+      const isIsbn = /^(978|979)\d{10}$/.test(code) || /^\d{9}[\dX]$/.test(code);
+      if (isIsbn) {
+        try {
+          const openBdRes = await fetch(`https://api.openbd.jp/v1/get?isbn=${code}`).then(r => r.json());
+          if (openBdRes && openBdRes[0] && openBdRes[0].summary) {
+            const s = openBdRes[0].summary;
+            setTargetBook({
+              id: code,
+              title: s.title || ('ISBN: ' + code),
+              author: s.author || '',
+              callNumber: 'ISBN'
+            });
+            playSuccessChime();
+            showShelfToast(`🎯 探す本を『${s.title}』(${s.author || '書籍'}) に設定しました！`, 'success');
+            if (bookPickerModal) bookPickerModal.style.display = 'none';
+            return;
+          }
+        } catch (e) {
+          console.warn('[resolveIsbnAndSetTarget] openBD fetch error:', e);
+        }
+      }
+
+      // 3. 一致する書誌情報がない場合でもコードを対象に設定
+      setTargetBook({
+        id: code,
+        title: isIsbn ? `ISBN: ${code}` : `図書ID: ${code}`,
+        author: '',
+        callNumber: ''
+      });
+      playSuccessChime();
+      showShelfToast(`🎯 対象コード『${code}』を探す本に設定しました`, 'info');
+      if (bookPickerModal) bookPickerModal.style.display = 'none';
     }
 
     function renderPickerResultItems(books) {
