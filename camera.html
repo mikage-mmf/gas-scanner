@@ -499,8 +499,14 @@
     const params = new URLSearchParams(window.location.search);
     let currentTargetInputId = params.get('target') || '';
     const scanMode = params.get('mode') || 'single';
-    let currentTargetLabel = params.get('label') || 'バーコード';
-    const currentLang = params.get('lang') || 'ja';
+    let rawLang = params.get('lang') || 'ja';
+    if (rawLang.startsWith('zh')) rawLang = 'zh-CN';
+    else if (rawLang.startsWith('en')) rawLang = 'en';
+    else if (rawLang.startsWith('ko')) rawLang = 'ko';
+    else if (rawLang.startsWith('pt')) rawLang = 'pt';
+    else if (rawLang.startsWith('vi')) rawLang = 'vi';
+    else if (rawLang.startsWith('tl') || rawLang.startsWith('fil')) rawLang = 'tl';
+    const currentLang = CAMERA_I18N[rawLang] ? rawLang : 'ja';
 
     function t(key, vars = {}) {
       const dict = CAMERA_I18N[currentLang] || CAMERA_I18N['ja'];
