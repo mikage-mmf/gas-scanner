@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>図書バーコードスキャナー (Camera Scanner)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📷</text></svg>">
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -499,6 +500,7 @@
     const params = new URLSearchParams(window.location.search);
     let currentTargetInputId = params.get('target') || '';
     const scanMode = params.get('mode') || 'single';
+    let currentTargetLabel = params.get('label') || 'バーコード';
     let rawLang = params.get('lang') || 'ja';
     if (rawLang.startsWith('zh')) rawLang = 'zh-CN';
     else if (rawLang.startsWith('en')) rawLang = 'en';
@@ -543,6 +545,7 @@
     // バッジ & UI
     const badgeEl = document.getElementById('target-badge');
     const statusArea = document.getElementById('status-area');
+    if (statusArea) statusArea.textContent = t('ready');
     const scannerBox = document.getElementById('scanner-box');
     const successOverlay = document.getElementById('success-overlay');
     const successCodeDisplay = document.getElementById('success-code-display');
