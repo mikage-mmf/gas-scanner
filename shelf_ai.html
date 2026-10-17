@@ -169,6 +169,36 @@
   }
 
   /* カメラ・ビューファインダー */
+  
+  /* ビューファインダー右上カメラ切替オーバーレイボタン */
+  .shelf-viewfinder-switch-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 25;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .shelf-viewfinder-switch-btn:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    transform: translateY(-1px);
+  }
+
   .shelf-viewfinder-card {
     background: #000;
     border: 1px solid var(--shelf-border);
@@ -1081,6 +1111,10 @@
     <!-- カメラ・ビューファインダー（画像 & バウンディングボックス表示） -->
     <div class="shelf-viewfinder-card">
       <video id="shelf-video" autoplay playsinline muted></video>
+      <!-- カメラ切替オーバーレイボタン（ビューファインダー右上） -->
+      <button type="button" class="shelf-viewfinder-switch-btn" id="btn-shelf-overlay-switch-cam" title="カメラ切替" style="display: none;">
+        🔄 <span data-i18n="shelf.switchCamera">カメラ切替</span>
+      </button>
       <canvas id="shelf-canvas" style="display: none;"></canvas>
 
       <!-- ガイドラインオーバーレイ（撮影前） -->
@@ -2003,6 +2037,447 @@
       }
     };
 
+    
+    // 追加の多言語キー定義マージ (ガイド文・書架名・ステータス)
+    const SHELF_EXTRA_I18N = {
+  "ja": {
+    "guideInventory": "📖 本棚の1段を枠内に水平に収めて撮影してください",
+    "guideFind": "🎯 探している本『{title}』がある棚を枠内に収めて撮影してください",
+    "resultsInventory": "📚 検出された書籍一覧（左から右への順）",
+    "resultsFind": "🎯 探索結果（検出された書籍）",
+    "analyzingDetailInventory": "本棚の背表紙をAIが解析中...\n(文字認識・台帳照合・乱架判定)",
+    "analyzingDetailFind": "探している本『{title}』を背表紙AIが画像から探索中...\n(文字認識・照合・ターゲッティング)",
+    "badgeNormal": "正常",
+    "badgeTarget": "🎯 探していた本",
+    "badgeMisplaced": "⚠️ 乱架",
+    "badgeUnknown": "未登録",
+    "badgeHere": "✨ ここにあります！",
+    "noBooksFound": "該当する本が見つかりませんでした",
+    "noBooksDetected": "検出された書籍がありません",
+    "shelfNotHere": "この段には無し",
+    "booksDetectedCount": "{count} 冊検出",
+    "tiersCount": "({count}段)",
+    "authorLabel": "著者",
+    "publisherLabel": "出版社",
+    "callNumberLabel": "分類",
+    "btnSelect": "選択",
+    "syncing": "同期中...",
+    "noLogs": "まだ点検ログがありません",
+    "savingInventory": "点検台帳に保存中...",
+    "barcodeStarting": "カメラ起動中...",
+    "barcodeLibLoading": "スキャナーライブラリを読込中...",
+    "barcodeAlign": "ISBNバーコード（978...）を枠に合わせてください",
+    "barcodeLowerWarning": "⚠️ 下段の書籍コード(192)です。上の段(978...)を枠に合わせてください",
+    "shelfGroupLit": "文学・小説 (900)",
+    "shelfA1": "A-1 (日本文学・小説 913)",
+    "shelfA2": "A-2 (日本文学・古典 910-912)",
+    "shelfA3": "A-3 (英米・海外文学 930-990)",
+    "shelfGroupSci": "自然科学・技術 (400-500)",
+    "shelfB1": "B-1 (理科・生物 460-480)",
+    "shelfB2": "B-2 (宇宙・地球 440-450)",
+    "shelfGroupHist": "歴史・社会 (200-300)",
+    "shelfC1": "C-1 (日本史・世界史 210-220)",
+    "shelfC2": "C-2 (社会・政治・経済 300-330)",
+    "shelfGroupKids": "絵本・児童書 (E)",
+    "shelfD1": "D-1 (大型絵本・低学年向け)"
+  },
+  "en": {
+    "guideInventory": "📖 Frame a single shelf horizontally inside the guide",
+    "guideFind": "🎯 Point camera at the shelf where \"{title}\" is located",
+    "resultsInventory": "📚 Detected Books (Left to Right)",
+    "resultsFind": "🎯 Search Results (Detected Books)",
+    "analyzingDetailInventory": "AI is analyzing spine images...\n(OCR · Inventory Check · Order Validation)",
+    "analyzingDetailFind": "Spine AI is searching for \"{title}\"...\n(OCR · Matching · AR Targeting)",
+    "badgeNormal": "Normal",
+    "badgeTarget": "🎯 Target Book",
+    "badgeMisplaced": "⚠️ Misplaced",
+    "badgeUnknown": "Unregistered",
+    "badgeHere": "✨ Here it is!",
+    "noBooksFound": "No matching books found",
+    "noBooksDetected": "No books detected",
+    "shelfNotHere": "Not on this tier",
+    "booksDetectedCount": "{count} books detected",
+    "tiersCount": "({count} tiers)",
+    "authorLabel": "Author",
+    "publisherLabel": "Publisher",
+    "callNumberLabel": "Call No.",
+    "btnSelect": "Select",
+    "syncing": "Syncing...",
+    "noLogs": "No inspection logs yet",
+    "savingInventory": "Saving to inventory log...",
+    "barcodeStarting": "Starting camera...",
+    "barcodeLibLoading": "Loading scanner library...",
+    "barcodeAlign": "Align 978... ISBN barcode within the frame",
+    "barcodeLowerWarning": "⚠️ Lower barcode (192) detected. Please align upper barcode (978...)",
+    "shelfGroupLit": "Literature & Fiction (900)",
+    "shelfA1": "A-1 (Japanese Lit / Fiction 913)",
+    "shelfA2": "A-2 (Japanese Classics 910-912)",
+    "shelfA3": "A-3 (World Literature 930-990)",
+    "shelfGroupSci": "Natural Science & Tech (400-500)",
+    "shelfB1": "B-1 (Science & Biology 460-480)",
+    "shelfB2": "B-2 (Space & Earth 440-450)",
+    "shelfGroupHist": "History & Society (200-300)",
+    "shelfC1": "C-1 (History 210-220)",
+    "shelfC2": "C-2 (Society, Politics, Econ 300-330)",
+    "shelfGroupKids": "Picture Books & Children (E)",
+    "shelfD1": "D-1 (Picture Books / Early Readers)"
+  },
+  "zh-CN": {
+    "guideInventory": "📖 请将一层书架水平对齐在取景框内拍照",
+    "guideFind": "🎯 请对准存放《{title}》的书架拍摄",
+    "resultsInventory": "📚 识别到的图书列表（从左至右）",
+    "resultsFind": "🎯 查找结果（识别到的图书）",
+    "analyzingDetailInventory": "AI正在分析书脊中...\n(文字识别 · 台账比对 · 错架判定)",
+    "analyzingDetailFind": "背表纸AI正在图像中寻找《{title}》...\n(文字识别 · 智能比对 · AR定位)",
+    "badgeNormal": "正常",
+    "badgeTarget": "🎯 正在寻找的书",
+    "badgeMisplaced": "⚠️ 错架",
+    "badgeUnknown": "未登记",
+    "badgeHere": "✨ 就在这里！",
+    "noBooksFound": "未找到符合条件的图书",
+    "noBooksDetected": "未检测到图书",
+    "shelfNotHere": "本层未找到",
+    "booksDetectedCount": "检测到 {count} 册",
+    "tiersCount": "({count}层)",
+    "authorLabel": "作者",
+    "publisherLabel": "出版社",
+    "callNumberLabel": "分类号",
+    "btnSelect": "选择",
+    "syncing": "正在同步...",
+    "noLogs": "暂无清点记录",
+    "savingInventory": "正在保存清点结果...",
+    "barcodeStarting": "正在启动相机...",
+    "barcodeLibLoading": "正在加载扫描组件...",
+    "barcodeAlign": "请将 978... ISBN条形码对准取景框",
+    "barcodeLowerWarning": "⚠️ 此为下段图书代码(192)，请对准上段条形码(978...)",
+    "shelfGroupLit": "文学・小说 (900)",
+    "shelfA1": "A-1 (日本文学・小说 913)",
+    "shelfA2": "A-2 (古典文学 910-912)",
+    "shelfA3": "A-3 (外国文学 930-990)",
+    "shelfGroupSci": "自然科学・技术 (400-500)",
+    "shelfB1": "B-1 (理科・生物 460-480)",
+    "shelfB2": "B-2 (宇宙・地球 440-450)",
+    "shelfGroupHist": "历史・社会 (200-300)",
+    "shelfC1": "C-1 (日本史・世界史 210-220)",
+    "shelfC2": "C-2 (社会・政治・经济 300-330)",
+    "shelfGroupKids": "绘本・儿童读物 (E)",
+    "shelfD1": "D-1 (大型绘本・低年级读物)"
+  },
+  "ko": {
+    "guideInventory": "📖 서가의 1단을 프레임 안에 수평으로 맞춰 촬영해 주세요",
+    "guideFind": "🎯 찾고 있는 도서 『{title}』이 있는 서가를 비추어 촬영해 주세요",
+    "resultsInventory": "📚 인식된 도서 목록 (좌에서 우로)",
+    "resultsFind": "🎯 탐색 결과 (인식된 도서)",
+    "analyzingDetailInventory": "등표지 AI 분석 중...\n(문자인식 · 장서대사 · 배치검사)",
+    "analyzingDetailFind": "등표지 AI가 『{title}』 도서를 찾는 중...\n(문자인식 · 매칭 · AR 타겟팅)",
+    "badgeNormal": "정상",
+    "badgeTarget": "🎯 찾고 있던 책",
+    "badgeMisplaced": "⚠️ 배치오류",
+    "badgeUnknown": "미등록",
+    "badgeHere": "✨ 여기에 있습니다!",
+    "noBooksFound": "해당 도서를 찾을 수 없습니다",
+    "noBooksDetected": "감지된 도서가 없습니다",
+    "shelfNotHere": "이 단에는 없음",
+    "booksDetectedCount": "{count}권 감지",
+    "tiersCount": "({count}단)",
+    "authorLabel": "저자",
+    "publisherLabel": "출판사",
+    "callNumberLabel": "청구기호",
+    "btnSelect": "선택",
+    "syncing": "동기화 중...",
+    "noLogs": "아직 점검 기록이 없습니다",
+    "savingInventory": "장서점검 대장에 저장 중...",
+    "barcodeStarting": "카메라 시작 중...",
+    "barcodeLibLoading": "스캐너 라이브러리 로딩 중...",
+    "barcodeAlign": "978... ISBN 바코드를 프레임에 맞춰주세요",
+    "barcodeLowerWarning": "⚠️ 하단 도서코드(192)입니다. 상단 바코드(978...)를 맞춰주세요",
+    "shelfGroupLit": "문학·소설 (900)",
+    "shelfA1": "A-1 (일본문학·소설 913)",
+    "shelfA2": "A-2 (고전문학 910-912)",
+    "shelfA3": "A-3 (해외문학 930-990)",
+    "shelfGroupSci": "자연과학·기술 (400-500)",
+    "shelfB1": "B-1 (과학·생물 460-480)",
+    "shelfB2": "B-2 (우주·지구 440-450)",
+    "shelfGroupHist": "역사·사회 (200-300)",
+    "shelfC1": "C-1 (역사 210-220)",
+    "shelfC2": "C-2 (사회·정치·경제 300-330)",
+    "shelfGroupKids": "그림책·아동도서 (E)",
+    "shelfD1": "D-1 (그림책·저학년용)"
+  },
+  "pt": {
+    "guideInventory": "📖 Enquadre uma prateleira horizontalmente dentro do guia",
+    "guideFind": "🎯 Aponte a câmera para a estante onde está \"{title}\"",
+    "resultsInventory": "📚 Livros Detectados (Da Esquerda para Direita)",
+    "resultsFind": "🎯 Resultados da Busca (Livros Detectados)",
+    "analyzingDetailInventory": "A IA está analisando as lombadas...\n(OCR · Verificação de Inventário · Ordem)",
+    "analyzingDetailFind": "A IA está procurando por \"{title}\"...\n(OCR · Correspondência · Alvo AR)",
+    "badgeNormal": "Normal",
+    "badgeTarget": "🎯 Livro Procurado",
+    "badgeMisplaced": "⚠️ Fora de Ordem",
+    "badgeUnknown": "Não Cadastrado",
+    "badgeHere": "✨ Está aqui!",
+    "noBooksFound": "Nenhum livro correspondente encontrado",
+    "noBooksDetected": "Nenhum livro detectado",
+    "shelfNotHere": "Não está nesta prateleira",
+    "booksDetectedCount": "{count} livros detectados",
+    "tiersCount": "({count} níveis)",
+    "authorLabel": "Autor",
+    "publisherLabel": "Editora",
+    "callNumberLabel": "Classificação",
+    "btnSelect": "Selecionar",
+    "syncing": "Sincronizando...",
+    "noLogs": "Nenhum registro ainda",
+    "savingInventory": "Salvando no registro de inventário...",
+    "barcodeStarting": "Iniciando câmera...",
+    "barcodeLibLoading": "Carregando biblioteca do scanner...",
+    "barcodeAlign": "Alinhe o código 978... na moldura",
+    "barcodeLowerWarning": "⚠️ Código inferior (192). Por favor, alinhe o código superior (978...)",
+    "shelfGroupLit": "Literatura e Ficção (900)",
+    "shelfA1": "A-1 (Literatura Japonesa 913)",
+    "shelfA2": "A-2 (Clássicos Japoneses 910-912)",
+    "shelfA3": "A-3 (Literatura Estrangeira 930-990)",
+    "shelfGroupSci": "Ciências Naturais e Tecnologia (400-500)",
+    "shelfB1": "B-1 (Ciência e Biologia 460-480)",
+    "shelfB2": "B-2 (Espaço e Terra 440-450)",
+    "shelfGroupHist": "História e Sociedade (200-300)",
+    "shelfC1": "C-1 (História 210-220)",
+    "shelfC2": "C-2 (Sociedade, Política, Economia 300-330)",
+    "shelfGroupKids": "Livros Infantis e Ilustrados (E)",
+    "shelfD1": "D-1 (Livros Ilustrados para Crianças)"
+  },
+  "vi": {
+    "guideInventory": "📖 Căn chỉnh một tầng kệ theo chiều ngang trong khung hướng dẫn",
+    "guideFind": "🎯 Hướng camera vào kệ có sách \"{title}\"",
+    "resultsInventory": "📚 Danh sách sách nhận diện (Từ trái sang phải)",
+    "resultsFind": "🎯 Kết quả tìm kiếm (Sách nhận diện)",
+    "analyzingDetailInventory": "AI đang phân tích gáy sách...\n(OCR · Kiểm kê · Thứ tự sách)",
+    "analyzingDetailFind": "AI đang tìm cuốn sách \"{title}\"...\n(OCR · Đối chiếu · Định vị AR)",
+    "badgeNormal": "Bình thường",
+    "badgeTarget": "🎯 Sách cần tìm",
+    "badgeMisplaced": "⚠️ Sai vị trí",
+    "badgeUnknown": "Chưa đăng ký",
+    "badgeHere": "✨ Sách ở đây!",
+    "noBooksFound": "Không tìm thấy cuốn sách nào phù hợp",
+    "noBooksDetected": "Không phát hiện cuốn sách nào",
+    "shelfNotHere": "Không có ở tầng này",
+    "booksDetectedCount": "Phát hiện {count} cuốn",
+    "tiersCount": "({count} tầng)",
+    "authorLabel": "Tác giả",
+    "publisherLabel": "Nhà xuất bản",
+    "callNumberLabel": "Phân loại",
+    "btnSelect": "Chọn",
+    "syncing": "Đang đồng bộ...",
+    "noLogs": "Chưa có nhật ký kiểm kê nào",
+    "savingInventory": "Đang lưu vào sổ kiểm kê...",
+    "barcodeStarting": "Đang khởi động camera...",
+    "barcodeLibLoading": "Đang tải thư viện máy quét...",
+    "barcodeAlign": "Căn chỉnh mã 978... vào khung camera",
+    "barcodeLowerWarning": "⚠️ Đây là mã dưới (192). Vui lòng quét mã trên (978...)",
+    "shelfGroupLit": "Văn học & Tiểu thuyết (900)",
+    "shelfA1": "A-1 (Văn học Nhật Bản 913)",
+    "shelfA2": "A-2 (Văn học cổ điển 910-912)",
+    "shelfA3": "A-3 (Văn học nước ngoài 930-990)",
+    "shelfGroupSci": "Khoa học tự nhiên & Kỹ thuật (400-500)",
+    "shelfB1": "B-1 (Khoa học & Sinh học 460-480)",
+    "shelfB2": "B-2 (Vũ trụ & Trái đất 440-450)",
+    "shelfGroupHist": "Lịch sử & Xã hội (200-300)",
+    "shelfC1": "C-1 (Lịch sử 210-220)",
+    "shelfC2": "C-2 (Xã hội, Chính trị, Kinh tế 300-330)",
+    "shelfGroupKids": "Sách tranh & Thiếu nhi (E)",
+    "shelfD1": "D-1 (Sách tranh cho trẻ em)"
+  },
+  "tl": {
+    "guideInventory": "📖 Ihanay nang pahiga ang isang baitang ng istante sa loob ng gabay",
+    "guideFind": "🎯 Itapat ang camera sa istanteng kinalalagyan ng \"{title}\"",
+    "resultsInventory": "📚 Mga Nakitang Aklat (Kaliwa pakanan)",
+    "resultsFind": "🎯 Resulta ng Paghahanap (Mga Nakitang Aklat)",
+    "analyzingDetailInventory": "Sinusuri ng AI ang mga aklat...\n(OCR · Pagsusuri ng Imbentaryo · Ayos)",
+    "analyzingDetailFind": "Hinahanap ng AI ang \"{title}\"...\n(OCR · Pagtutugma · AR Target)",
+    "badgeNormal": "Normal",
+    "badgeTarget": "🎯 Hinahanap na Aklat",
+    "badgeMisplaced": "⚠️ Maling Ayos",
+    "badgeUnknown": "Hindi Nakatala",
+    "badgeHere": "✨ Nandito ito!",
+    "noBooksFound": "Walang nahanap na tugmang aklat",
+    "noBooksDetected": "Walang nakitang aklat",
+    "shelfNotHere": "Wala sa baitang na ito",
+    "booksDetectedCount": "{count} aklat ang nakita",
+    "tiersCount": "({count} baitang)",
+    "authorLabel": "May-akda",
+    "publisherLabel": "Tagapaglathala",
+    "callNumberLabel": "Kaurian",
+    "btnSelect": "Pumili",
+    "syncing": "Nag-synchronize...",
+    "noLogs": "Wala pang tala ng imbentaryo",
+    "savingInventory": "Inililigtas sa talaan...",
+    "barcodeStarting": "Sinisimulan ang camera...",
+    "barcodeLibLoading": "Naglo-load ng library...",
+    "barcodeAlign": "Itapat ang 978... barcode sa loob ng kahon",
+    "barcodeLowerWarning": "⚠️ Ibabang barcode (192). Itapat ang itaas na barcode (978...)",
+    "shelfGroupLit": "Panitikan at Fiction (900)",
+    "shelfA1": "A-1 (Panitikang Hapon 913)",
+    "shelfA2": "A-2 (Klasikong Hapon 910-912)",
+    "shelfA3": "A-3 (Panitikang Banyaga 930-990)",
+    "shelfGroupSci": "Agham at Teknolohiya (400-500)",
+    "shelfB1": "B-1 (Agham at Biyolohiya 460-480)",
+    "shelfB2": "B-2 (Kalawakan at Mundo 440-450)",
+    "shelfGroupHist": "Kasaysayan at Lipunan (200-300)",
+    "shelfC1": "C-1 (Kasaysayan 210-220)",
+    "shelfC2": "C-2 (Lipunan, Pulitika, Ekonomiya 300-330)",
+    "shelfGroupKids": "Mga Aklat Pambata (E)",
+    "shelfD1": "D-1 (Mga Aklat Pambata)"
+  }
+};
+    Object.keys(SHELF_EXTRA_I18N).forEach(lang => {
+      if (SHELF_I18N[lang]) {
+        Object.assign(SHELF_I18N[lang], SHELF_EXTRA_I18N[lang]);
+      }
+    });
+
+    
+    const SHELF_MORE_I18N = {
+  "ja": {
+    "callNumberUnset": "分類未設定",
+    "settingsSaved": "設定を保存しました ({model})",
+    "runningSimulation": "シミュレーションモードで動作します",
+    "searchingCatalog": "蔵書台帳を検索中...",
+    "targetBookCodeSet": "🎯 対象コード『{code}』を探す本に設定しました",
+    "titleUnknown": "タイトル不明",
+    "authorUnknown": "不明",
+    "cameraStartError": "カメラ起動エラー: {error}",
+    "posFormatMultiHtml": "上から <strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong> 段目 の 左から <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> 番目",
+    "posFormatSingleHtml": "左から <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> 番目"
+  },
+  "en": {
+    "callNumberUnset": "Unclassified",
+    "settingsSaved": "Settings saved ({model})",
+    "runningSimulation": "Running in simulation mode",
+    "searchingCatalog": "Searching catalog...",
+    "targetBookCodeSet": "🎯 Target book set to code \"{code}\"",
+    "titleUnknown": "Unknown Title",
+    "authorUnknown": "Unknown",
+    "cameraStartError": "Camera start error: {error}",
+    "posFormatMultiHtml": "Tier <strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong> from top, #<strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> from left",
+    "posFormatSingleHtml": "#<strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> from left"
+  },
+  "zh-CN": {
+    "callNumberUnset": "未分类",
+    "settingsSaved": "设置已保存 ({model})",
+    "runningSimulation": "以仿真模式运行",
+    "searchingCatalog": "正在检索藏书台账...",
+    "targetBookCodeSet": "🎯 已将代码【{code}】设为目标图书",
+    "titleUnknown": "书名未知",
+    "authorUnknown": "未知",
+    "cameraStartError": "相机启动失败: {error}",
+    "posFormatMultiHtml": "从上数第 <strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong> 层・从左数第 <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> 本",
+    "posFormatSingleHtml": "从左数第 <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> 本"
+  },
+  "ko": {
+    "callNumberUnset": "분류미설정",
+    "settingsSaved": "설정이 저장되었습니다 ({model})",
+    "runningSimulation": "시뮬레이션 모드로 작동합니다",
+    "searchingCatalog": "도서 대장 검색 중...",
+    "targetBookCodeSet": "🎯 대상 코드 『{code}』을(를) 찾을 책으로 설정했습니다",
+    "titleUnknown": "제목 미상",
+    "authorUnknown": "미상",
+    "cameraStartError": "카메라 시작 오류: {error}",
+    "posFormatMultiHtml": "위에서 <strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong>번째 단・왼쪽에서 <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong>번째",
+    "posFormatSingleHtml": "왼쪽에서 <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong>번째"
+  },
+  "pt": {
+    "callNumberUnset": "Não classificado",
+    "settingsSaved": "Configurações salvas ({model})",
+    "runningSimulation": "Executando em modo de simulação",
+    "searchingCatalog": "Pesquisando catálogo...",
+    "targetBookCodeSet": "🎯 Código alvo \"{code}\" definido como livro procurado",
+    "titleUnknown": "Título Desconhecido",
+    "authorUnknown": "Desconhecido",
+    "cameraStartError": "Erro ao iniciar câmera: {error}",
+    "posFormatMultiHtml": "<strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong>ª prateleira de cima, <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong>º da esquerda",
+    "posFormatSingleHtml": "<strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong>º da esquerda"
+  },
+  "vi": {
+    "callNumberUnset": "Chưa phân loại",
+    "settingsSaved": "Đã lưu cài đặt ({model})",
+    "runningSimulation": "Đang chạy chế độ mô phỏng",
+    "searchingCatalog": "Đang tìm kiếm danh mục...",
+    "targetBookCodeSet": "🎯 Đã đặt mã \"{code}\" làm sách cần tìm",
+    "titleUnknown": "Tựa đề không rõ",
+    "authorUnknown": "Không rõ",
+    "cameraStartError": "Lỗi khởi động camera: {error}",
+    "posFormatMultiHtml": "Tầng <strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong> từ trên xuống, cuốn thứ <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> từ trái sang",
+    "posFormatSingleHtml": "Cuốn thứ <strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> từ trái sang"
+  },
+  "tl": {
+    "callNumberUnset": "Hindi Nauuri",
+    "settingsSaved": "Nai-save ang mga setting ({model})",
+    "runningSimulation": "Tumatakbo sa simulation mode",
+    "searchingCatalog": "Naghahanap sa katalogo...",
+    "targetBookCodeSet": "🎯 Itinakda ang code \"{code}\" bilang aklat",
+    "titleUnknown": "Hindi Alam ang Pamagat",
+    "authorUnknown": "Hindi Alam",
+    "cameraStartError": "Error sa pagsisimula ng camera: {error}",
+    "posFormatMultiHtml": "Pang-<strong style=\"font-size: 1.3rem; color: #facc15;\">{tier}</strong> na baitang mula sa itaas, pang-<strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> mula sa kaliwa",
+    "posFormatSingleHtml": "Pang-<strong style=\"font-size: 1.3rem; color: #facc15;\">{col}</strong> mula sa kaliwa"
+  }
+};
+    Object.keys(SHELF_MORE_I18N).forEach(lang => {
+      if (SHELF_I18N[lang]) {
+        Object.assign(SHELF_I18N[lang], SHELF_MORE_I18N[lang]);
+      }
+    });
+
+    
+    const SHELF_TOAST_I18N = {
+  "ja": {
+    "analyzeFailed": "解析に失敗しました",
+    "networkError": "サーバー通信エラー: {error}",
+    "endpointMissing": "図書システムのエンドポイントが設定されていません。メイン画面から再度起動してください。",
+    "tierPrefix": "{tier}段-"
+  },
+  "en": {
+    "analyzeFailed": "Analysis failed",
+    "networkError": "Network error: {error}",
+    "endpointMissing": "System endpoint not configured. Please launch from main app.",
+    "tierPrefix": "Tier {tier}-"
+  },
+  "zh-CN": {
+    "analyzeFailed": "分析失败",
+    "networkError": "网络通信错误: {error}",
+    "endpointMissing": "未配置系统端点，请从主页面重新启动。",
+    "tierPrefix": "第{tier}层-"
+  },
+  "ko": {
+    "analyzeFailed": "분석 실패",
+    "networkError": "서버 통신 오류: {error}",
+    "endpointMissing": "시스템 엔드포인트가 설정되지 않았습니다. 메인 화면에서 다시 실행해 주세요.",
+    "tierPrefix": "{tier}단-"
+  },
+  "pt": {
+    "analyzeFailed": "Falha na análise",
+    "networkError": "Erro de rede: {error}",
+    "endpointMissing": "Endpoint do sistema não configurado. Inicie pelo app principal.",
+    "tierPrefix": "{tier}ª prateleira-"
+  },
+  "vi": {
+    "analyzeFailed": "Phân tích thất bại",
+    "networkError": "Lỗi kết nối: {error}",
+    "endpointMissing": "Chưa cấu hình điểm cuối. Vui lòng mở lại từ ứng dụng chính.",
+    "tierPrefix": "Tầng {tier}-"
+  },
+  "tl": {
+    "analyzeFailed": "Nabigo ang pagsusuri",
+    "networkError": "Error sa koneksyon: {error}",
+    "endpointMissing": "Walang naka-set na endpoint. Buksan muli mula sa pangunahing app.",
+    "tierPrefix": "Baitang {tier}-"
+  }
+};
+    Object.keys(SHELF_TOAST_I18N).forEach(lang => {
+      if (SHELF_I18N[lang]) {
+        Object.assign(SHELF_I18N[lang], SHELF_TOAST_I18N[lang]);
+      }
+    });
+
     let currentLang = 'ja';
 
     function initI18n() {
@@ -2032,11 +2507,40 @@
       });
 
       document.title = t('pageTitle') || '背表紙AI蔵書点検システム | Shelf AI';
+      updateShelfSelectOptions();
+    }
+
+    /**
+     * 書架選択セレクトボックスの多言語オプション動的生成
+     */
+    function updateShelfSelectOptions() {
+      if (!shelfSelect) return;
+      const currentVal = shelfSelect.value || currentShelfId || 'A-1';
+      shelfSelect.innerHTML = `
+        <optgroup label="${t('shelfGroupLit')}">
+          <option value="A-1">${t('shelfA1')}</option>
+          <option value="A-2">${t('shelfA2')}</option>
+          <option value="A-3">${t('shelfA3')}</option>
+        </optgroup>
+        <optgroup label="${t('shelfGroupSci')}">
+          <option value="B-1">${t('shelfB1')}</option>
+          <option value="B-2">${t('shelfB2')}</option>
+        </optgroup>
+        <optgroup label="${t('shelfGroupHist')}">
+          <option value="C-1">${t('shelfC1')}</option>
+          <option value="C-2">${t('shelfC2')}</option>
+        </optgroup>
+        <optgroup label="${t('shelfGroupKids')}">
+          <option value="D-1">${t('shelfD1')}</option>
+        </optgroup>
+      `;
+      shelfSelect.value = currentVal;
     }
 
     function t(key, vars = {}) {
+      const cleanKey = String(key || '').replace(/^shelf\./, '');
       const dict = SHELF_I18N[currentLang] || SHELF_I18N['ja'];
-      let str = dict[key] || SHELF_I18N['ja'][key] || key;
+      let str = dict[key] || dict[cleanKey] || (SHELF_I18N['ja'] && (SHELF_I18N['ja'][key] || SHELF_I18N['ja'][cleanKey])) || key;
       Object.keys(vars).forEach(k => {
         str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), vars[k]);
       });
@@ -2053,24 +2557,26 @@
         const devices = await navigator.mediaDevices.enumerateDevices();
         availableVideoDevices = devices.filter(d => d.kind === 'videoinput');
 
+        // 仮想カメラ (OBS, Virtual, Snap, Vysor, Dummy, Unity等) を末尾に、物理背面カメラを最優先にソート
         availableVideoDevices.sort((a, b) => {
           const aLabel = (a.label || '').toLowerCase();
           const bLabel = (b.label || '').toLowerCase();
-          const aVirtual = aLabel.includes('virtual') || aLabel.includes('obs') || aLabel.includes('snap') || aLabel.includes('vysor');
-          const bVirtual = bLabel.includes('virtual') || bLabel.includes('obs') || bLabel.includes('snap') || bLabel.includes('vysor');
+          const aVirtual = /virtual|obs|snap|vysor|dummy|unity/.test(aLabel);
+          const bVirtual = /virtual|obs|snap|vysor|dummy|unity/.test(bLabel);
           if (aVirtual && !bVirtual) return 1;
           if (!aVirtual && bVirtual) return -1;
-          const aBack = aLabel.includes('back') || aLabel.includes('rear') || aLabel.includes('environment');
-          const bBack = bLabel.includes('back') || bLabel.includes('rear') || bLabel.includes('environment');
+          const aBack = /back|rear|environment/.test(aLabel);
+          const bBack = /back|rear|environment/.test(bLabel);
           if (aBack && !bBack) return -1;
           if (!aBack && bBack) return 1;
           return 0;
         });
 
-        const switchBtn = document.getElementById('btn-shelf-switch-cam');
-        if (switchBtn) {
-          switchBtn.style.display = availableVideoDevices.length > 1 ? 'inline-flex' : 'none';
-        }
+        // カメラ切替ボタンの表示/非表示同期 (シャッターバー & ビューファインダー右上オーバーレイ)
+        const switchBtns = document.querySelectorAll('#btn-shelf-switch-cam, #btn-shelf-overlay-switch-cam');
+        switchBtns.forEach(btn => {
+          btn.style.display = availableVideoDevices.length > 1 ? 'inline-flex' : 'none';
+        });
       } catch (e) {
         console.warn('[Shelf AI] enumerateDevices error:', e);
       }
@@ -2084,7 +2590,7 @@
         currentVideoDeviceIndex = (currentVideoDeviceIndex + 1) % availableVideoDevices.length;
         const dev = availableVideoDevices[currentVideoDeviceIndex];
         showShelfToast(`📷 ${dev.label || `Camera ${currentVideoDeviceIndex + 1}`}`, 'info');
-        await startCamera();
+        await startCamera(dev.deviceId);
       } else {
         showShelfToast(t('noOtherCamera'), 'info');
       }
@@ -2243,18 +2749,18 @@
       if (inventoryFooterActions) inventoryFooterActions.style.display = currentMode === 'inventory' ? 'flex' : 'none';
       if (findFooterActions) findFooterActions.style.display = currentMode === 'find' ? 'flex' : 'none';
 
-      // ガイドテキスト更新
+      // ガイドテキスト更新 (完全多言語化)
       if (guideText) {
         guideText.textContent = currentMode === 'find'
-          ? `🎯 探している本『${targetBook.title}』がある棚を枠内に収めて撮影してください`
-          : '📖 本棚の1段を枠内に水平に収めて撮影してください';
+          ? t('guideFind', { title: targetBook.title })
+          : t('guideInventory');
       }
 
-      // リストヘッダータイトル更新
+      // リストヘッダータイトル更新 (完全多言語化)
       if (resultsSectionTitle) {
         resultsSectionTitle.textContent = currentMode === 'find'
-          ? '🎯 探索結果（検出された書籍）'
-          : '📚 検出された書籍一覧（左から右への順）';
+          ? t('resultsFind')
+          : t('resultsInventory');
       }
 
       // ビューファインダー内バナー初期化
@@ -2263,7 +2769,7 @@
 
       // 探索サマリーの初期化
       if (currentMode === 'find') {
-        updateFindSummary(false, -1, 0, '📷 本棚を撮影してください');
+        updateFindSummary(false, -1, 0, t('promptShoot'));
       }
 
       // 以前の解析結果をリセット
@@ -2295,10 +2801,10 @@
         targetTitleEl.textContent = `『${targetBook.title}』${targetBook.author ? ` (${targetBook.author})` : ''}`;
       }
       if (targetCallnumEl) {
-        targetCallnumEl.textContent = targetBook.callNumber || (targetBook.id ? `ID: ${targetBook.id}` : '分類未設定');
+        targetCallnumEl.textContent = targetBook.callNumber || (targetBook.id ? `ID: ${targetBook.id}` : t('callNumberUnset'));
       }
       if (guideText && currentMode === 'find') {
-        guideText.textContent = `🎯 探している本『${targetBook.title}』がある棚を枠内に収めて撮影してください`;
+        guideText.textContent = t('guideFind', { title: targetBook.title });
       }
     }
 
@@ -2364,7 +2870,7 @@
     /**
      * カメラ起動 (物理背面カメラ優先・デバイスインデックス対応)
      */
-    async function startCamera() {
+    async function startCamera(preferredDeviceId = null) {
       try {
         if (currentStream) {
           currentStream.getTracks().forEach(track => track.stop());
@@ -2377,11 +2883,22 @@
           height: { ideal: 1080 }
         };
 
-        if (availableVideoDevices.length > 0) {
-          const selectedDev = availableVideoDevices[currentVideoDeviceIndex % availableVideoDevices.length];
-          if (selectedDev && selectedDev.deviceId) {
+        if (preferredDeviceId) {
+          videoConstraint = {
+            deviceId: { exact: preferredDeviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          };
+        } else if (availableVideoDevices.length > 0) {
+          // 仮想カメラ (OBS等) を除外した物理カメラを最優先選択
+          const nonVirtualDev = availableVideoDevices.find(d => {
+            const lbl = (d.label || '').toLowerCase();
+            return lbl && !/virtual|obs|snap|vysor|dummy|unity/.test(lbl);
+          });
+          const targetDev = nonVirtualDev || availableVideoDevices[currentVideoDeviceIndex % availableVideoDevices.length];
+          if (targetDev && targetDev.deviceId) {
             videoConstraint = {
-              deviceId: { exact: selectedDev.deviceId },
+              deviceId: { exact: targetDev.deviceId },
               width: { ideal: 1920 },
               height: { ideal: 1080 }
             };
@@ -2404,8 +2921,26 @@
         if (targetFoundBanner) targetFoundBanner.style.display = 'none';
         if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
 
-        // カメラ許可後にデバイス一覧を再取得（ラベル付きで取得できる）
+        // カメラ許可後にデバイス一覧を再取得（ラベル付きで取得可能になる）
         await initCameraDevices();
+
+        // 【仮想カメラ自動検知 & 物理カメラへのフェイルオーバー】
+        // Windows/Chromeが初回デフォルトとしてOBS等の仮想カメラを掴んでいた場合、物理カメラが存在すれば即座に切り替える
+        if (!preferredDeviceId) {
+          const currentTrack = stream.getVideoTracks()[0];
+          const activeLabel = (currentTrack ? currentTrack.label : '').toLowerCase();
+          if (/virtual|obs|snap|vysor|dummy|unity/.test(activeLabel)) {
+            const physicalDev = availableVideoDevices.find(d => {
+              const lbl = (d.label || '').toLowerCase();
+              return lbl && !/virtual|obs|snap|vysor|dummy|unity/.test(lbl);
+            });
+            if (physicalDev && physicalDev.deviceId) {
+              console.log('[Shelf AI] Virtual camera detected (' + activeLabel + '), auto-switching to physical device: ' + physicalDev.label);
+              currentVideoDeviceIndex = availableVideoDevices.indexOf(physicalDev);
+              return await startCamera(physicalDev.deviceId);
+            }
+          }
+        }
       } catch (err) {
         console.warn('[Shelf Camera] カメラ起動エラー:', err);
         try {
@@ -2426,11 +2961,10 @@
      * イベントバインド
      */
     function bindEvents() {
-      // カメラ切り替えボタン
-      const switchCamBtn = document.getElementById('btn-shelf-switch-cam');
-      if (switchCamBtn) {
-        switchCamBtn.addEventListener('click', switchCamera);
-      }
+      // カメラ切り替えボタン (シャッターバー & ビューファインダー右上)
+      document.querySelectorAll('#btn-shelf-switch-cam, #btn-shelf-overlay-switch-cam').forEach(btn => {
+        btn.addEventListener('click', switchCamera);
+      });
 
       // モード切替タブ
       tabInventory.addEventListener('click', () => setMode('inventory'));
@@ -2455,7 +2989,7 @@
       // 棚選択切り替え（点検モード）
       shelfSelect.addEventListener('change', (e) => {
         currentShelfId = e.target.value;
-        showShelfToast(`対象棚を【${currentShelfId}】に切り替えました`, 'info');
+        showShelfToast(t('shelfSwitched', { shelf: currentShelfId }), 'info');
       });
 
       // 点検確定（点検モード）
@@ -2491,7 +3025,7 @@
             const callnum = chip.getAttribute('data-callnum');
             setTargetBook({ id, title, author, callNumber: callnum });
             bookPickerModal.style.display = 'none';
-            showShelfToast(`🎯 探す本を『${title}』に設定しました`, 'info');
+            showShelfToast(t('targetBookSet', { title }), 'info');
           });
         });
       }
@@ -2556,7 +3090,7 @@
         localStorage.setItem('shelf_gemini_api_key', key);
         localStorage.setItem('shelf_gemini_model', model);
         settingsModal.style.display = 'none';
-        showShelfToast(key ? `設定を保存しました (${model})` : 'シミュレーションモードで動作します', 'success');
+        showShelfToast(key ? t('settingsSaved', { model }) : t('runningSimulation'), 'success');
       });
     }
 
@@ -2599,7 +3133,7 @@
         return;
       }
 
-      pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">蔵書台帳を検索中...</div>';
+      pickerResults.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">${t('searchingCatalog')}</div>`;
 
       try {
         const res = await callSearchBooksApi(query);
@@ -2643,7 +3177,7 @@
       if (filtered.length > 0) {
         renderPickerResultItems(filtered);
       } else {
-        pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
+        pickerResults.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">${t('noBooksFound')}</div>`;
       }
     }
 
@@ -2681,13 +3215,13 @@
      */
     async function startIsbnScanner() {
       if (barcodeModal) barcodeModal.style.display = 'flex';
-      if (barcodeStatusEl) barcodeStatusEl.textContent = 'カメラ起動中...';
+      if (barcodeStatusEl) barcodeStatusEl.textContent = t('barcodeStarting');
 
       // メインカメラのストリームを一時停止してカメラを解放
       stopCamera();
 
       if (typeof Html5Qrcode === 'undefined') {
-        if (barcodeStatusEl) barcodeStatusEl.textContent = 'スキャナーライブラリを読込中...';
+        if (barcodeStatusEl) barcodeStatusEl.textContent = t('barcodeLibLoading');
         return;
       }
 
@@ -2714,12 +3248,12 @@
         );
         isBarcodeScanning = true;
         if (barcodeStatusEl) {
-          barcodeStatusEl.textContent = 'ISBNバーコード（978...）を枠に合わせてください';
+          barcodeStatusEl.textContent = t('barcodeAlign');
         }
       } catch (err) {
         console.warn('[Barcode Scanner] 起動エラー:', err);
         if (barcodeStatusEl) {
-          barcodeStatusEl.textContent = 'カメラ起動エラー: ' + (err.message || 'アクセス権限がありません');
+          barcodeStatusEl.textContent = t('cameraStartError', { error: err.message || t('cameraAccessDenied') });
         }
       }
     }
@@ -2754,7 +3288,7 @@
       if (/^192\d{10}$/.test(code)) {
         playBeep(330, 0.25);
         if (barcodeStatusEl) {
-          barcodeStatusEl.textContent = '⚠️ 下段の書籍コード(192)です。上の段(978...)を枠に合わせてください';
+          barcodeStatusEl.textContent = t('barcodeLowerWarning');
         }
         return;
       }
@@ -2796,7 +3330,7 @@
           callNumber: bookFound.call_number || ''
         });
         playSuccessChime();
-        showShelfToast(`🎯 探す本を『${bookFound.title}』に設定しました！`, 'success');
+        showShelfToast(t('targetBookSet', { title: bookFound.title }), 'success');
         if (bookPickerModal) bookPickerModal.style.display = 'none';
         return;
       }
@@ -2815,7 +3349,7 @@
               callNumber: 'ISBN'
             });
             playSuccessChime();
-            showShelfToast(`🎯 探す本を『${s.title}』(${s.author || '書籍'}) に設定しました！`, 'success');
+            showShelfToast(t('targetBookSet', { title: s.title }), 'success');
             if (bookPickerModal) bookPickerModal.style.display = 'none';
             return;
           }
@@ -2832,13 +3366,13 @@
         callNumber: ''
       });
       playSuccessChime();
-      showShelfToast(`🎯 対象コード『${code}』を探す本に設定しました`, 'info');
+      showShelfToast(t('targetBookCodeSet', { code }), 'info');
       if (bookPickerModal) bookPickerModal.style.display = 'none';
     }
 
     function renderPickerResultItems(books) {
       if (!books || books.length === 0) {
-        pickerResults.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">該当する本が見つかりませんでした</div>';
+        pickerResults.innerHTML = `<div style="padding: 16px; text-align: center; color: var(--shelf-text-muted); font-size: 0.82rem;">${t('noBooksFound')}</div>`;
         return;
       }
 
@@ -2847,11 +3381,11 @@
           <div>
             <div class="shelf-picker-item-title">${escapeHtml(b.title)}</div>
             <div class="shelf-picker-item-sub">
-              著者: ${escapeHtml(b.author || '不明')} | 出版社: ${escapeHtml(b.publisher || '---')} | 分類: ${escapeHtml(b.call_number || '---')}
+              ${t('authorLabel')}: ${escapeHtml(b.author || '---')} | ${t('publisherLabel')}: ${escapeHtml(b.publisher || '---')} | ${t('callNumberLabel')}: ${escapeHtml(b.call_number || '---')}
             </div>
           </div>
           <button type="button" class="shelf-btn-secondary" style="padding: 4px 10px; font-size: 0.78rem; border-color: rgba(245, 158, 11, 0.4); color: #fde68a;">
-            🎯 選択
+            🎯 ${t('btnSelect')}
           </button>
         </div>
       `).join('');
@@ -2955,7 +3489,7 @@
 
     function renderLogsTable(logs) {
       if (!logs || logs.length === 0) {
-        logsTableBody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--shelf-text-muted);">まだ点検ログがありません</td></tr>';
+        logsTableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--shelf-text-muted);">${t('noLogs')}</td></tr>`;
         return;
       }
 
@@ -3054,8 +3588,8 @@
     function sendImageToAI(imageBase64) {
       const isFind = currentMode === 'find';
       const promptDesc = isFind
-        ? `探している本『${targetBook.title}』を背表紙AIが画像から探索中...\n(文字認識・照合・ターゲッティング)`
-        : '本棚の背表紙をAIが解析中...\n(文字認識・台帳照合・乱架判定)';
+        ? t('analyzingDetailFind', { title: targetBook.title })
+        : t('analyzingDetailInventory');
       showLoading(promptDesc);
 
       const apiKey = localStorage.getItem('shelf_gemini_api_key') || '';
@@ -3077,12 +3611,12 @@
             if (res && res.status === 'success') {
               handleAnalysisSuccess(res.data);
             } else {
-              showShelfToast(res?.message || '解析に失敗しました', 'danger');
+              showShelfToast(res?.message || t('analyzeFailed'), 'danger');
             }
           })
           .withFailureHandler((err) => {
             hideLoading();
-            showShelfToast('サーバー通信エラー: ' + err.message, 'danger');
+            showShelfToast(t('networkError', { error: err.message }), 'danger');
           })
           .apiDispatcher('apiAnalyzeShelfSpines', [imageBase64, options]);
       } else {
@@ -3090,7 +3624,7 @@
         const endpoint = getGasCanonicalExecUrl();
         if (!endpoint && !options.useMock) {
           hideLoading();
-          showShelfToast('図書システムのエンドポイントが設定されていません。メイン画面から再度起動してください。', 'warning');
+          showShelfToast(t('endpointMissing'), 'warning');
           return;
         }
 
@@ -3216,17 +3750,17 @@
       if (findPositionVal) {
         if (found) {
           if (totalTiers > 1) {
-            findPositionVal.innerHTML = `上から <strong style="font-size: 1.3rem; color: #facc15;">${tier}</strong> 段目 の 左から <strong style="font-size: 1.3rem; color: #facc15;">${col}</strong> 番目`;
+            findPositionVal.innerHTML = t('posFormatMultiHtml', { tier, col });
           } else {
-            findPositionVal.innerHTML = `左から <strong style="font-size: 1.3rem; color: #facc15;">${col}</strong> 番目`;
+            findPositionVal.innerHTML = t('posFormatSingleHtml', { col });
           }
         } else {
-          findPositionVal.innerHTML = totalCount > 0 ? '<span style="font-size: 0.9rem; color: var(--shelf-text-muted);">この段には無し</span>' : '---';
+          findPositionVal.innerHTML = totalCount > 0 ? `<span style="font-size: 0.9rem; color: var(--shelf-text-muted);">${t('shelfNotHere')}</span>` : '---';
         }
       }
 
       if (findCountVal) {
-        findCountVal.textContent = `${totalCount || 0} 冊検出 ${totalTiers > 1 ? `(${totalTiers}段)` : ''}`;
+        findCountVal.textContent = `${t('booksDetectedCount', { count: totalCount || 0 })} ${totalTiers > 1 ? t('tiersCount', { count: totalTiers }) : ''}`;
       }
     }
 
@@ -3289,7 +3823,7 @@
         if (isTarget) {
           const tier = Number(spine.shelf_tier || fullData?.target_shelf_tier || 1);
           const col = Number(spine.order_in_tier || fullData?.target_order_in_tier || (idx + 1));
-          const pinText = totalTiers > 1 ? `これです！ (${tier}段目-${col}番)` : `これです！ (${col}番)`;
+          const pinText = `${t('badgeHere')} (${totalTiers > 1 ? `${tier}-` : ''}#${col})`;
 
           // ターゲット本の指差しピン
           const pin = document.createElement('div');
@@ -3299,14 +3833,14 @@
 
           el.innerHTML += `
             <div class="shelf-bbox-tag">
-              ✨ ここにあります！ (${totalTiers > 1 ? `${tier}段目-` : ''}#${col})
+              ${t('badgeHere')} (${totalTiers > 1 ? t('tierPrefix', { tier: tier }) : ''}#${col})
             </div>
           `;
         } else {
-          const tierLabel = spine.shelf_tier && totalTiers > 1 ? `${spine.shelf_tier}段-` : '';
+          const tierLabel = spine.shelf_tier && totalTiers > 1 ? t('tierPrefix', { tier: spine.shelf_tier }) : '';
           el.innerHTML = `
             <div class="shelf-bbox-tag">
-              ${spine.is_misplaced ? '⚠️ 乱架' : `${tierLabel}#${spine.order_in_tier || spine.order}`}
+              ${spine.is_misplaced ? t('badgeMisplaced') : `${tierLabel}#${spine.order_in_tier || spine.order}`}
             </div>
           `;
         }
@@ -3326,7 +3860,7 @@
     function renderBooksTrack(spines) {
       booksTrack.innerHTML = '';
       if (!spines || spines.length === 0) {
-        booksTrack.innerHTML = '<div style="color: var(--shelf-text-muted); font-size: 0.85rem; padding: 8px;">検出された書籍がありません</div>';
+        booksTrack.innerHTML = `<div style="color: var(--shelf-text-muted); font-size: 0.85rem; padding: 8px;">${t('noBooksDetected')}</div>`;
         return;
       }
 
@@ -3344,24 +3878,24 @@
         card.setAttribute('data-index', idx);
 
         let badgeClass = 'normal';
-        let badgeLabel = `正常 (#${spine.order})`;
+        let badgeLabel = `${t('badgeNormal')} (#${spine.order})`;
 
         if (isTarget) {
           badgeClass = 'target';
-          badgeLabel = `🎯 探していた本 (#${spine.order})`;
+          badgeLabel = `${t('badgeTarget')} (#${spine.order})`;
         } else if (spine.is_misplaced) {
           badgeClass = 'misplaced';
-          badgeLabel = `⚠️ 乱架(並び違い) (#${spine.order})`;
+          badgeLabel = `${t('badgeMisplaced')} (#${spine.order})`;
         } else if (!spine.is_registered) {
           badgeClass = 'warning';
-          badgeLabel = `未登録 (#${spine.order})`;
+          badgeLabel = `${t('badgeUnknown')} (#${spine.order})`;
         }
 
         card.innerHTML = `
           <div class="shelf-card-badge ${badgeClass}">${badgeLabel}</div>
-          <div class="shelf-card-title">${escapeHtml(spine.title || 'タイトル不明')}</div>
-          <div class="shelf-card-meta">著者: ${escapeHtml(spine.author || '不明')}</div>
-          <div class="shelf-card-meta">分類: <strong>${escapeHtml(spine.call_number || '---')}</strong></div>
+          <div class="shelf-card-title">${escapeHtml(spine.title || t('titleUnknown'))}</div>
+          <div class="shelf-card-meta">${t('authorLabel')}: ${escapeHtml(spine.author || '---')}</div>
+          <div class="shelf-card-meta">${t('callNumberLabel')}: <strong>${escapeHtml(spine.call_number || '---')}</strong></div>
           ${spine.misplaced_reason ? `<div style="font-size: 0.7rem; color: var(--shelf-danger); margin-top: 4px; font-weight: 600;">${escapeHtml(spine.misplaced_reason)}</div>` : ''}
         `;
 
@@ -3404,7 +3938,7 @@
     function saveInventory() {
       if (!lastAnalysisResult) return;
 
-      showLoading(t('loadingLogs') || '点検台帳に保存中...');
+      showLoading(t('savingInventory'));
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
