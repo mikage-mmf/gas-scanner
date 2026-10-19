@@ -1876,6 +1876,10 @@
       "btnDeleteKey": "キーを削除",
       "confirmDeleteKey": "保存されているGemini APIキーをこの端末から完全に削除しますか？",
       "apiKeyDeleted": "APIキーを削除しました。シミュレーションモードで動作します",
+      "confirmDeletePrompt": "本当に削除しますか？",
+      "btnConfirmDelete": "削除する",
+      "undo": "元に戻す",
+      "keyRestoredToast": "APIキーを復元しました",
       "syncModelsSuccess": "Googleから最新モデル一覧 ({count}件) を同期しました！",
       "syncModelsSuccessMock": "Googleから最新モデル一覧（gemini-3.8-flash等 3件）を同期しました (テスト)",
       "syncError": "同期エラー: {error}",
@@ -2718,6 +2722,10 @@
       "btnDeleteKey": "Delete Key",
       "confirmDeleteKey": "Are you sure you want to completely delete the saved Gemini API key from this device?",
       "apiKeyDeleted": "API key deleted. Running in simulation mode.",
+      "confirmDeletePrompt": "Delete permanently?",
+      "btnConfirmDelete": "Delete",
+      "undo": "Undo",
+      "keyRestoredToast": "API key restored",
       "syncModelsSuccess": "Successfully synced latest models from Google ({count} found)!",
       "syncModelsSuccessMock": "Synced latest model list from Google (gemini-3.8-flash, etc. 3 models) (Test)",
       "syncError": "Sync error: {error}",
@@ -3560,6 +3568,10 @@
       "btnDeleteKey": "删除密钥",
       "confirmDeleteKey": "确定要从此设备中完全删除已保存的Gemini API密钥吗？",
       "apiKeyDeleted": "已删除API密钥。将运行在模拟模式。",
+      "confirmDeletePrompt": "确定要删除吗？",
+      "btnConfirmDelete": "删除",
+      "undo": "撤销",
+      "keyRestoredToast": "已恢复API密钥",
       "syncModelsSuccess": "已从Google成功同步最新模型列表（共 {count} 个）！",
       "syncModelsSuccessMock": "已从Google同步最新模型列表（gemini-3.8-flash等 3个）(测试)",
       "syncError": "同步错误: {error}",
@@ -4399,6 +4411,10 @@
       "btnDeleteKey": "키 삭제",
       "confirmDeleteKey": "이 기기에서 저장된 Gemini API 키를 완전히 삭제하시겠습니까?",
       "apiKeyDeleted": "API 키가 삭제되었습니다. 시뮬레이션 모드로 작동합니다.",
+      "confirmDeletePrompt": "정말 삭제하시겠습니까?",
+      "btnConfirmDelete": "삭제",
+      "undo": "실행 취소",
+      "keyRestoredToast": "API 키가 복원되었습니다",
       "syncModelsSuccess": "Google에서 최신 모델 목록({count}개)을 동기화했습니다!",
       "syncModelsSuccessMock": "Google에서 최신 모델 목록(gemini-3.8-flash 등 3개)을 동기화했습니다 (테스트)",
       "syncError": "동기화 오류: {error}",
@@ -5238,6 +5254,10 @@
       "btnDeleteKey": "Excluir chave",
       "confirmDeleteKey": "Tem certeza de que deseja excluir permanentemente a chave de API Gemini deste dispositivo?",
       "apiKeyDeleted": "Chave de API excluída. Operando em modo de simulação.",
+      "confirmDeletePrompt": "Excluir permanentemente?",
+      "btnConfirmDelete": "Excluir",
+      "undo": "Desfazer",
+      "keyRestoredToast": "Chave de API restaurada",
       "syncModelsSuccess": "Modelos mais recentes sincronizados do Google com sucesso ({count} encontrados)!",
       "syncModelsSuccessMock": "Lista de modelos mais recentes sincronizada do Google (gemini-3.8-flash, etc. 3 modelos) (Teste)",
       "syncError": "Erro de sincronização: {error}",
@@ -6077,6 +6097,10 @@
       "btnDeleteKey": "Xóa mã khóa",
       "confirmDeleteKey": "Bạn có chắc chắn muốn xóa vĩnh viễn khóa API Gemini khỏi thiết bị này không?",
       "apiKeyDeleted": "Đã xóa mã khóa API. Đang hoạt động ở chế độ mô phỏng.",
+      "confirmDeletePrompt": "Bạn có chắc muốn xóa không?",
+      "btnConfirmDelete": "Xóa",
+      "undo": "Hoàn tác",
+      "keyRestoredToast": "Đã khôi phục mã khóa API",
       "syncModelsSuccess": "Đã đồng bộ danh sách mô hình mới nhất từ Google ({count} mô hình)!",
       "syncModelsSuccessMock": "Đã đồng bộ danh sách mô hình từ Google (gemini-3.8-flash, v.v. 3 mô hình) (Thử nghiệm)",
       "syncError": "Lỗi đồng bộ: {error}",
@@ -6916,6 +6940,10 @@
       "btnDeleteKey": "Tanggalin ang Key",
       "confirmDeleteKey": "Sigurado ka bang nais mong ganap na tanggalin ang naka-save na Gemini API key sa device na ito?",
       "apiKeyDeleted": "Tinanggal ang API key. Tumatakbo sa simulation mode.",
+      "confirmDeletePrompt": "Tanggalin nang tuluyan?",
+      "btnConfirmDelete": "Tanggalin",
+      "undo": "I-undo",
+      "keyRestoredToast": "Naibalik ang API key",
       "syncModelsSuccess": "Matagumpay na na-sync ang pinakabagong mga modelo mula sa Google ({count} natagpuan)!",
       "syncModelsSuccessMock": "Na-sync ang listahan ng pinakabagong modelo mula sa Google (gemini-3.8-flash, atbp. 3 modelo) (Pagsubok)",
       "syncError": "Error sa pag-sync: {error}",
@@ -7566,10 +7594,10 @@
         <label style="font-size: 0.8rem; color: #fff; font-weight: 600; display: block; margin-bottom: 6px;" data-i18n="shelf.apiKeyLabel">
           Gemini API キー (任意):
         </label>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <input type="password" id="shelf-api-key-input" class="shelf-input" style="flex: 1;" placeholder="AIzaSy...">
-          <button type="button" id="btn-shelf-delete-api-key" class="shelf-btn-secondary" style="color: #f43f5e; border-color: rgba(244,63,94,0.4); display: none; white-space: nowrap; padding: 10px 14px; font-size: 0.8rem; flex-shrink: 0;" data-i18n="shelf.btnDeleteKey">
-            🗑️ キーを削除
+        <div style="position: relative; display: flex; align-items: center;">
+          <input type="password" id="shelf-api-key-input" class="shelf-input" style="width: 100%; padding-right: 42px;" placeholder="AIzaSy...">
+          <button type="button" id="btn-shelf-toggle-api-key-visibility" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; color: var(--shelf-text-muted); padding: 4px 6px; line-height: 1;" title="表示/非表示を切り替え">
+            👁️
           </button>
         </div>
         <small style="color: var(--shelf-text-muted); font-size: 0.75rem; display: block; margin-top: 4px;" data-i18n="shelf.apiKeyHint">
@@ -7577,9 +7605,27 @@
         </small>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
-        <button type="button" class="shelf-btn-secondary" id="btn-shelf-close-settings" data-i18n="shelf.btnClose">閉じる</button>
-        <button type="button" class="shelf-btn-primary" id="btn-shelf-save-settings" style="flex: none; padding: 10px 20px;" data-i18n="shelf.btnSave">保存</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+        <!-- 安全な2段階キー削除エリア -->
+        <div id="shelf-api-key-delete-zone" style="display: none; align-items: center; gap: 6px;">
+          <button type="button" id="btn-shelf-delete-api-key" class="shelf-btn-secondary" style="color: #f43f5e; border-color: rgba(244,63,94,0.4); font-size: 0.78rem; padding: 8px 12px;" data-i18n="shelf.btnDeleteKey">
+            🗑️ キーを削除
+          </button>
+          <div id="shelf-api-key-confirm-box" style="display: none; align-items: center; gap: 6px;">
+            <span style="font-size: 0.75rem; color: #f43f5e; font-weight: 600;" data-i18n="shelf.confirmDeletePrompt">本当に削除しますか？</span>
+            <button type="button" id="btn-shelf-confirm-delete-api-key" class="shelf-btn-primary" style="background: #f43f5e; border-color: #f43f5e; font-size: 0.75rem; padding: 6px 12px;" data-i18n="shelf.btnConfirmDelete">
+              削除する
+            </button>
+            <button type="button" id="btn-shelf-cancel-delete-api-key" class="shelf-btn-secondary" style="font-size: 0.75rem; padding: 6px 10px;" data-i18n="shelf.btnCancel">
+              取消
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-left: auto;">
+          <button type="button" class="shelf-btn-secondary" id="btn-shelf-close-settings" data-i18n="shelf.btnClose">閉じる</button>
+          <button type="button" class="shelf-btn-primary" id="btn-shelf-save-settings" style="flex: none; padding: 10px 20px;" data-i18n="shelf.btnSave">保存</button>
+        </div>
       </div>
     </div>
   </div>
@@ -7782,9 +7828,15 @@
     const modelSelect = document.getElementById('shelf-model-select');
     const syncModelsBtn = document.getElementById('btn-shelf-sync-models');
     const apiKeyInput = document.getElementById('shelf-api-key-input');
+    const toggleApiKeyVisibilityBtn = document.getElementById('btn-shelf-toggle-api-key-visibility');
+    const apiKeyDeleteZone = document.getElementById('shelf-api-key-delete-zone');
     const deleteApiKeyBtn = document.getElementById('btn-shelf-delete-api-key');
+    const apiKeyConfirmBox = document.getElementById('shelf-api-key-confirm-box');
+    const confirmDeleteApiKeyBtn = document.getElementById('btn-shelf-confirm-delete-api-key');
+    const cancelDeleteApiKeyBtn = document.getElementById('btn-shelf-cancel-delete-api-key');
     const saveSettingsBtn = document.getElementById('btn-shelf-save-settings');
     const closeSettingsBtn = document.getElementById('btn-shelf-close-settings');
+    let lastDeletedApiKey = null;
 
     // DOM要素: 本ピッカーモーダル
     const bookPickerModal = document.getElementById('shelf-book-picker-modal');
@@ -8120,10 +8172,16 @@
       }
     }
 
+    function resetDeleteApiKeyConfirmation() {
+      if (deleteApiKeyBtn) deleteApiKeyBtn.style.display = 'inline-flex';
+      if (apiKeyConfirmBox) apiKeyConfirmBox.style.display = 'none';
+    }
+
     function updateDeleteApiKeyVisibility() {
-      if (!deleteApiKeyBtn) return;
+      resetDeleteApiKeyConfirmation();
+      if (!apiKeyDeleteZone) return;
       const currentKey = localStorage.getItem('shelf_gemini_api_key') || (apiKeyInput ? apiKeyInput.value.trim() : '');
-      deleteApiKeyBtn.style.display = currentKey ? 'inline-flex' : 'none';
+      apiKeyDeleteZone.style.display = currentKey ? 'flex' : 'none';
     }
 
     /**
@@ -8464,9 +8522,12 @@
       // 設定モーダル
       settingsBtn.addEventListener('click', () => {
         updateDeleteApiKeyVisibility();
+        if (apiKeyInput) apiKeyInput.type = 'password';
+        if (toggleApiKeyVisibilityBtn) toggleApiKeyVisibilityBtn.textContent = '👁️';
         settingsModal.style.display = 'flex';
       });
       closeSettingsBtn.addEventListener('click', () => {
+        resetDeleteApiKeyConfirmation();
         settingsModal.style.display = 'none';
       });
       if (syncModelsBtn) {
@@ -8477,14 +8538,50 @@
           updateDeleteApiKeyVisibility();
         });
       }
+      if (toggleApiKeyVisibilityBtn && apiKeyInput) {
+        toggleApiKeyVisibilityBtn.addEventListener('click', () => {
+          const isPassword = apiKeyInput.type === 'password';
+          apiKeyInput.type = isPassword ? 'text' : 'password';
+          toggleApiKeyVisibilityBtn.textContent = isPassword ? '🙈' : '👁️';
+        });
+      }
       if (deleteApiKeyBtn) {
         deleteApiKeyBtn.addEventListener('click', () => {
-          if (confirm(t('shelf.confirmDeleteKey'))) {
-            localStorage.removeItem('shelf_gemini_api_key');
-            if (apiKeyInput) apiKeyInput.value = '';
-            updateDeleteApiKeyVisibility();
-            showShelfToast(t('shelf.apiKeyDeleted'), 'info');
+          // 1回目のタップ: 即座に削除せず、インライン確認エリアへ安全に切り替え
+          deleteApiKeyBtn.style.display = 'none';
+          if (apiKeyConfirmBox) apiKeyConfirmBox.style.display = 'inline-flex';
+        });
+      }
+      if (cancelDeleteApiKeyBtn) {
+        cancelDeleteApiKeyBtn.addEventListener('click', () => {
+          resetDeleteApiKeyConfirmation();
+        });
+      }
+      if (confirmDeleteApiKeyBtn) {
+        confirmDeleteApiKeyBtn.addEventListener('click', () => {
+          const keyToDelete = localStorage.getItem('shelf_gemini_api_key') || (apiKeyInput ? apiKeyInput.value.trim() : '');
+          if (keyToDelete) {
+            lastDeletedApiKey = keyToDelete;
           }
+          localStorage.removeItem('shelf_gemini_api_key');
+          if (apiKeyInput) apiKeyInput.value = '';
+          updateDeleteApiKeyVisibility();
+          showShelfToast(
+            t('shelf.apiKeyDeleted'),
+            'info',
+            lastDeletedApiKey ? {
+              label: `↩️ ${t('shelf.undo')}`,
+              onClick: () => {
+                if (lastDeletedApiKey) {
+                  localStorage.setItem('shelf_gemini_api_key', lastDeletedApiKey);
+                  if (apiKeyInput) apiKeyInput.value = lastDeletedApiKey;
+                  updateDeleteApiKeyVisibility();
+                  showShelfToast(t('shelf.keyRestoredToast'), 'success');
+                  lastDeletedApiKey = null;
+                }
+              }
+            } : null
+          );
         });
       }
       saveSettingsBtn.addEventListener('click', () => {
@@ -9459,7 +9556,7 @@
     let shelfToastTimeout = null;
     let activeShelfToastEl = null;
 
-    function showShelfToast(msg, type = 'info') {
+    function showShelfToast(msg, type = 'info', action = null) {
       if (typeof msg === 'string') {
         if (msg.startsWith('error.') || msg.startsWith('shelf.') || msg.startsWith('loading.')) {
           msg = typeof t === 'function' ? t(msg) : msg;
@@ -9495,13 +9592,47 @@
         opacity: 0;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         max-width: 90%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
         text-align: center;
       `;
-      toast.textContent = msg;
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = msg;
+      toast.appendChild(textSpan);
+
+      if (action && action.label && typeof action.onClick === 'function') {
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.textContent = action.label;
+        actionBtn.style.cssText = `
+          background: rgba(255,255,255,0.28);
+          border: 1px solid rgba(255,255,255,0.6);
+          border-radius: 16px;
+          color: #fff;
+          font-size: 0.82rem;
+          font-weight: 700;
+          padding: 4px 12px;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.2s;
+        `;
+        actionBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          action.onClick();
+          try { toast.remove(); } catch (err) {}
+          activeShelfToastEl = null;
+        });
+        toast.appendChild(actionBtn);
+      }
+
       document.body.appendChild(toast);
       activeShelfToastEl = toast;
 
       setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(-50%) translateY(-8px)'; }, 10);
+      const displayDuration = action ? 8000 : 3500;
       shelfToastTimeout = setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(-50%) translateY(0)';
@@ -9509,7 +9640,7 @@
           if (activeShelfToastEl === toast) activeShelfToastEl = null;
           try { toast.remove(); } catch (e) {}
         }, 300);
-      }, 3500);
+      }, displayDuration);
     }
 
     function escapeHtml(str) {
