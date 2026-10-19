@@ -1410,6 +1410,7 @@
       "stationTitle": "端末の役割を切替",
       "alertNotFoundUserMsg": "未登録の利用者IDです: {id}",
       "latestReturnBorrowerPrefix": "借りていた人: ",
+      "borrowerRecorded": "記録あり",
       "btnConfirming": "貸出を確定中...",
       "alertNetworkTitle": "通信エラー",
       "alertNetworkMsg": "サーバーとの通信に失敗しました。もう一度お試しください。",
@@ -2248,6 +2249,7 @@
       "stationTitle": "Switch station mode",
       "alertNotFoundUserMsg": "Unregistered User ID: {id}",
       "latestReturnBorrowerPrefix": "Borrower: ",
+      "borrowerRecorded": "Recorded",
       "btnConfirming": "Confirming Checkout...",
       "alertNetworkTitle": "Connection Error",
       "alertNetworkMsg": "Failed to communicate with the server. Please try again.",
@@ -3086,6 +3088,7 @@
       "stationTitle": "切换工作站模式",
       "alertNotFoundUserMsg": "未注册的用户ID: {id}",
       "latestReturnBorrowerPrefix": "借阅人: ",
+      "borrowerRecorded": "已有借阅记录",
       "btnConfirming": "正在确认借阅...",
       "alertNetworkTitle": "网络错误",
       "alertNetworkMsg": "与服务器通信失败。请重试。",
@@ -3924,6 +3927,7 @@
       "stationTitle": "스테이션 모드 전환",
       "alertNotFoundUserMsg": "미등록 이용자 ID입니다: {id}",
       "latestReturnBorrowerPrefix": "대출자: ",
+      "borrowerRecorded": "기록 있음",
       "btnConfirming": "대출 확정 중...",
       "alertNetworkTitle": "통신 오류",
       "alertNetworkMsg": "서버와의 통신에 실패했습니다. 다시 시도해 주세요.",
@@ -4759,6 +4763,7 @@
       "stationTitle": "Alternar modo da estação",
       "alertNotFoundUserMsg": "ID de usuário não cadastrado: {id}",
       "latestReturnBorrowerPrefix": "Tomador: ",
+      "borrowerRecorded": "Registrado",
       "btnConfirming": "Confirmando empréstimo...",
       "alertNetworkTitle": "Erro de Conexão",
       "alertNetworkMsg": "Falha na comunicação com o servidor. Tente novamente.",
@@ -5594,6 +5599,7 @@
       "stationTitle": "Chuyển chế độ trạm",
       "alertNotFoundUserMsg": "Mã người dùng chưa được đăng ký: {id}",
       "latestReturnBorrowerPrefix": "Người mượn: ",
+      "borrowerRecorded": "Đã ghi nhận",
       "btnConfirming": "Đang xác nhận mượn...",
       "alertNetworkTitle": "Lỗi Kết Nối",
       "alertNetworkMsg": "Kết nối với máy chủ thất bại. Vui lòng thử lại.",
@@ -6429,6 +6435,7 @@
       "stationTitle": "Palitan ang mode ng istasyon",
       "alertNotFoundUserMsg": "Hindi nakarehistrong User ID: {id}",
       "latestReturnBorrowerPrefix": "Nanghiram: ",
+      "borrowerRecorded": "Nakatala",
       "btnConfirming": "Kinukumpirma ang paghiram...",
       "alertNetworkTitle": "Error sa Koneksyon",
       "alertNetworkMsg": "Nabigo ang pakikipag-ugnayan sa server. Pakisubukan muli.",
@@ -7916,6 +7923,35 @@
     }
 
     /**
+     * アクティブなカメラ映像ストリームをUIに適用
+     */
+    function applyActiveVideoStream(stream) {
+      currentStream = stream;
+      video.srcObject = stream;
+      video.style.display = 'block';
+      canvas.style.display = 'none';
+      if (bboxLayer) {
+        bboxLayer.innerHTML = '';
+        bboxLayer.style.display = 'none';
+      }
+      if (guideOverlay) guideOverlay.style.display = 'flex';
+      if (shutterBtn) shutterBtn.style.display = 'flex';
+      if (retakeBtn) retakeBtn.style.display = 'none';
+      if (targetFoundBanner) targetFoundBanner.style.display = 'none';
+      if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+
+      // カメラが正常に起動・映像取得できたため、古い警告トーストがあれば即時クリア
+      if (activeShelfToastEl) {
+        try { activeShelfToastEl.remove(); } catch (e) {}
+        activeShelfToastEl = null;
+      }
+      if (shelfToastTimeout) {
+        clearTimeout(shelfToastTimeout);
+        shelfToastTimeout = null;
+      }
+    }
+
+    /**
      * カメラ起動 (指定 deviceId または最適な物理カメラで最初から一発起動)
      */
     async function startCamera(targetDeviceId = null) {
@@ -7958,28 +7994,22 @@
           video: videoConstraint
         });
 
-        currentStream = stream;
-        video.srcObject = stream;
-        video.style.display = 'block';
-        canvas.style.display = 'none';
-        bboxLayer.innerHTML = '';
-        bboxLayer.style.display = 'none';
-        if (guideOverlay) guideOverlay.style.display = 'flex';
-        shutterBtn.style.display = 'flex';
-        retakeBtn.style.display = 'none';
-        if (targetFoundBanner) targetFoundBanner.style.display = 'none';
-        if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
+        applyActiveVideoStream(stream);
       } catch (err) {
-        console.warn('[Shelf Camera] Camera start error:', err);
+        console.warn('[Shelf Camera] Initial high-res start failed, trying standard fallback:', err);
         try {
-          // フォールバック: 標準制約で再試行
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-          currentStream = stream;
-          video.srcObject = stream;
-          video.style.display = 'block';
-          canvas.style.display = 'none';
+          // フォールバック: 標準制約で再試行（PC Webカメラや制約未対応端末向け）
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+          applyActiveVideoStream(fallbackStream);
         } catch (e) {
-          showShelfToast(t('shelf.cameraAccessDenied'), 'warning');
+          console.error('[Shelf Camera] Camera completely unavailable:', e);
+          // 実際にユーザーまたはブラウザから権限が拒否された場合のみ「アクセス拒否」を表示
+          if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showShelfToast(t('shelf.cameraAccessDenied'), 'warning');
+          } else {
+            const errDetail = e.message || e.name || '';
+            showShelfToast(t('shelf.cameraStartError', { error: errDetail }), 'warning');
+          }
         }
       }
     }
@@ -8277,96 +8307,6 @@
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
         currentStream = null;
-      }
-    }
-
-    /**
-     * カメラ起動 (物理背面カメラ優先・デバイスインデックス対応)
-     */
-    async function startCamera(preferredDeviceId = null) {
-      try {
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-          currentStream = null;
-        }
-
-        let videoConstraint = {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        };
-
-        if (preferredDeviceId) {
-          videoConstraint = {
-            deviceId: { exact: preferredDeviceId },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          };
-        } else if (availableVideoDevices.length > 0) {
-          // 仮想カメラ (OBS等) を除外した物理カメラを最優先選択
-          const nonVirtualDev = availableVideoDevices.find(d => {
-            const lbl = (d.label || '').toLowerCase();
-            return lbl && !/virtual|obs|snap|vysor|dummy|unity/.test(lbl);
-          });
-          const targetDev = nonVirtualDev || availableVideoDevices[currentVideoDeviceIndex % availableVideoDevices.length];
-          if (targetDev && targetDev.deviceId) {
-            videoConstraint = {
-              deviceId: { exact: targetDev.deviceId },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
-            };
-          }
-        }
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: videoConstraint
-        });
-        currentStream = stream;
-        video.srcObject = stream;
-        video.style.display = 'block';
-        canvas.style.display = 'none';
-        bboxLayer.innerHTML = '';
-        bboxLayer.style.display = 'none';
-        if (guideOverlay) guideOverlay.style.display = 'flex';
-        shutterBtn.style.display = 'flex';
-        retakeBtn.style.display = 'none';
-        if (targetFoundBanner) targetFoundBanner.style.display = 'none';
-        if (targetNotFoundBanner) targetNotFoundBanner.style.display = 'none';
-
-        // カメラ許可後にデバイス一覧を再取得（ラベル付きで取得可能になる）
-        await initCameraDevices();
-
-        // 【仮想カメラ自動検知 & 物理カメラへのフェイルオーバー】
-        // Windows/Chromeが初回デフォルトとしてOBS等の仮想カメラを掴んでいた場合、物理カメラが存在すれば即座に切り替える
-        if (!preferredDeviceId) {
-          const currentTrack = stream.getVideoTracks()[0];
-          const activeLabel = (currentTrack ? currentTrack.label : '').toLowerCase();
-          if (/virtual|obs|snap|vysor|dummy|unity/.test(activeLabel)) {
-            const physicalDev = availableVideoDevices.find(d => {
-              const lbl = (d.label || '').toLowerCase();
-              return lbl && !/virtual|obs|snap|vysor|dummy|unity/.test(lbl);
-            });
-            if (physicalDev && physicalDev.deviceId) {
-              console.log('[Shelf AI] Virtual camera detected (' + activeLabel + '), auto-switching to physical device: ' + physicalDev.label);
-              currentVideoDeviceIndex = availableVideoDevices.indexOf(physicalDev);
-              return await startCamera(physicalDev.deviceId);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[Shelf Camera] カメラ起動エラー:', err);
-        try {
-          // フォールバック: 標準制約で再試行
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-          currentStream = stream;
-          video.srcObject = stream;
-          video.style.display = 'block';
-          canvas.style.display = 'none';
-          await initCameraDevices();
-        } catch (e) {
-          showShelfToast(t('shelf.cameraAccessDenied'), 'warning');
-        }
       }
     }
 
